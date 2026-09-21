@@ -1,12 +1,28 @@
+import Constants from 'expo-constants';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BodyPart, Exercise, ExperienceLevel, Profile } from './types';
 
+const API_PORT = 3001;
+
 /**
- * Base URL of the exercise API (see ../server).
- * Override with EXPO_PUBLIC_API_URL — a real phone needs this Mac's LAN
- * address, e.g. EXPO_PUBLIC_API_URL=http://192.168.1.143:3001
+ * Base URL of the API (see ../server).
+ *
+ * A phone can't reach the dev machine's "localhost", so in development we
+ * borrow the host Expo is already serving the bundle from — the same address
+ * the QR code points at. Set EXPO_PUBLIC_API_URL to override, which a release
+ * build needs since `hostUri` only exists while developing.
  */
-export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001';
+function defaultApiUrl(): string {
+  if (process.env.EXPO_PUBLIC_API_URL) return process.env.EXPO_PUBLIC_API_URL;
+
+  const hostUri = Constants.expoConfig?.hostUri; // e.g. "192.168.1.143:8081"
+  const host = hostUri?.split(':')[0];
+  if (host) return `http://${host}:${API_PORT}`;
+
+  return `http://localhost:${API_PORT}`;
+}
+
+export const API_URL = defaultApiUrl();
 
 const TIMEOUT_MS = 8000;
 
@@ -87,7 +103,7 @@ export function describe(err: unknown): string {
   if (!(err instanceof Error)) return "Couldn't reach the exercise server.";
   if (err.name === 'AbortError') return 'Server took too long to answer.';
   // fetch() rejects with an opaque message when the host is unreachable.
-  if (/network request failed|failed to fetch/i.test(err.message)) return "Couldn't reach the exercise server.";
+  if (/network request failed|failed to fetch/i.test(err.message)) return `Couldn't reach the server at ${API_URL}.`;
   return err.message;
 }
 

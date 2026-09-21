@@ -31,11 +31,13 @@ npm install
 npm start
 ```
 
-The app calls `http://localhost:3001` by default, which works in the simulator and on the web. A real phone needs this machine's LAN address instead:
+In development the app finds the API by itself: it takes the host Expo serves the bundle from (the address in the QR code) and calls port 3001 there, so a phone on the same Wi-Fi works with no configuration. Override it — or point a release build at a real server — with:
 
 ```bash
 EXPO_PUBLIC_API_URL=http://192.168.1.143:3001 npx expo start
 ```
+
+If the phone says it can't reach the server: check it's on the same network as this Mac, that `npm start` is running in `server/`, and that the address in the error message is reachable from the phone's browser.
 
 ## API
 
