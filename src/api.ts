@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BodyPart, Exercise, ExperienceLevel } from './types';
+import { BodyPart, Exercise, ExperienceLevel, Profile } from './types';
 
 /**
  * Base URL of the exercise API (see ../server).
@@ -8,7 +8,9 @@ import { BodyPart, Exercise, ExperienceLevel } from './types';
  */
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-const TIMEOUT_MS = 6000;
+const TIMEOUT_MS = 8000;
+
+export type AuthUser = { id: string; email: string; profile: Profile };
 
 export type SuggestedLoad = {
   /** Working weight in kg, per hand for dumbbells. Null for bodyweight and cardio. */
@@ -22,39 +24,66 @@ export type Suggestion = Exercise & {
   also: BodyPart[];
   equipment: string;
   compound: boolean;
-  /** Only present when a bodyweight was sent with the request. */
+  /** Only present once the account has a bodyweight. */
   suggestedLoad?: SuggestedLoad;
 };
 
-/** Height is deliberately not sent: it does not predict how much you can lift. */
-export type LoadProfile = { weightKg: number | null; level: ExperienceLevel };
+type RequestOptions = { method?: string; body?: unknown; token?: string | null };
 
-export async function fetchSuggestions(parts: BodyPart[], profile?: LoadProfile): Promise<Suggestion[]> {
-  if (parts.length === 0) return [];
-
+/** One place for JSON, auth headers, timeouts and turning errors into messages. */
+async function request<T>(path: string, { method = 'GET', body, token }: RequestOptions = {}): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const query = new URLSearchParams({ parts: parts.join(',') });
-    if (profile?.weightKg) {
-      query.set('bodyweight', String(profile.weightKg));
-      query.set('level', profile.level);
-    }
-    const url = `${API_URL}/exercises?${query.toString()}`;
-    const res = await fetch(url, { signal: controller.signal });
+    const res = await fetch(`${API_URL}${path}`, {
+      method,
+      signal: controller.signal,
+      headers: {
+        ...(body ? { 'content-type': 'application/json' } : {}),
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
     if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      throw new Error(body?.error ?? `Server returned ${res.status}`);
+      const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+      const error = new Error(payload?.error ?? `Server returned ${res.status}`);
+      error.name = res.status === 401 ? 'UnauthorizedError' : error.name;
+      throw error;
     }
-    const body = (await res.json()) as { exercises: Suggestion[] };
-    return body.exercises;
+    return (await res.json()) as T;
   } finally {
     clearTimeout(timer);
   }
 }
 
+// ---- accounts ----
+
+export const signUp = (email: string, password: string) =>
+  request<{ token: string; user: AuthUser }>('/auth/signup', { method: 'POST', body: { email, password } });
+
+export const signIn = (email: string, password: string) =>
+  request<{ token: string; user: AuthUser }>('/auth/login', { method: 'POST', body: { email, password } });
+
+export const signOutRequest = (token: string) => request<{ ok: true }>('/auth/logout', { method: 'POST', token });
+
+export const fetchMe = (token: string) => request<{ user: AuthUser }>('/me', { token });
+
+export const patchProfile = (token: string, patch: Partial<Profile>) =>
+  request<{ user: AuthUser }>('/me', { method: 'PATCH', body: patch, token });
+
+// ---- exercises ----
+
+export async function fetchSuggestions(parts: BodyPart[], token?: string | null): Promise<Suggestion[]> {
+  if (parts.length === 0) return [];
+  // The server reads bodyweight and level from the signed-in account.
+  const query = new URLSearchParams({ parts: parts.join(',') });
+  const body = await request<{ exercises: Suggestion[] }>(`/exercises?${query.toString()}`, { token });
+  return body.exercises;
+}
+
 /** A message worth showing: the server's complaint beats a generic network error. */
-function describe(err: unknown): string {
+export function describe(err: unknown): string {
   if (!(err instanceof Error)) return "Couldn't reach the exercise server.";
   if (err.name === 'AbortError') return 'Server took too long to answer.';
   // fetch() rejects with an opaque message when the host is unreachable.
@@ -63,13 +92,11 @@ function describe(err: unknown): string {
 }
 
 /** Fetches suggestions for `parts`, re-running when the selection or profile changes. */
-export function useSuggestions(parts: BodyPart[], profile?: LoadProfile) {
+export function useSuggestions(parts: BodyPart[], token: string | null, level?: ExperienceLevel, weightKg?: number | null) {
   const [exercises, setExercises] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const key = [...parts].sort().join(',');
-  const weightKg = profile?.weightKg ?? null;
-  const level = profile?.level ?? 'beginner';
   // Only the latest request may write to state.
   const requestId = useRef(0);
 
@@ -85,7 +112,7 @@ export function useSuggestions(parts: BodyPart[], profile?: LoadProfile) {
     }
 
     setLoading(true);
-    fetchSuggestions(wanted, { weightKg, level })
+    fetchSuggestions(wanted, token)
       .then((list) => {
         if (id !== requestId.current) return;
         setExercises(list);
@@ -99,7 +126,8 @@ export function useSuggestions(parts: BodyPart[], profile?: LoadProfile) {
       .finally(() => {
         if (id === requestId.current) setLoading(false);
       });
-  }, [key, weightKg, level]);
+    // level and weightKg are not sent, but a change to either must refetch.
+  }, [key, token, level, weightKg]);
 
   useEffect(load, [load]);
 

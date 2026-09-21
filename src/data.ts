@@ -1,4 +1,4 @@
-import { Agenda, BodyPart, Exercise, Weekday } from './types';
+import { Agenda, BodyPart, DayPlan, Weekday } from './types';
 
 export const BODY_PARTS: { key: BodyPart; label: string; color: string }[] = [
   { key: 'chest', label: 'Chest', color: '#FF6B6B' },
@@ -36,42 +36,23 @@ export const WEEK_ORDER: Weekday[] = [1, 2, 3, 4, 5, 6, 0];
 let idCounter = 0;
 export const newId = () => `${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
 
-const ex = (name: string, sets: string, reps: string): Exercise => ({ id: newId(), name, sets, reps });
+/** A blank day: no title, no muscles, no exercises. */
+const emptyDay = (): DayPlan => ({ title: '', rest: false, bodyParts: [], exercises: [] });
 
+/** New accounts start with an empty week — the plan is whatever you decide to train. */
 export const DEFAULT_AGENDA: Agenda = {
-  1: {
-    title: 'Push',
-    rest: false,
-    bodyParts: ['chest', 'shoulders', 'triceps'],
-    exercises: [ex('Bench Press', '4', '6-8'), ex('Overhead Press', '3', '8-10'), ex('Tricep Pushdown', '3', '12')],
-  },
-  2: {
-    title: 'Pull',
-    rest: false,
-    bodyParts: ['back', 'biceps'],
-    exercises: [ex('Pull-ups', '4', '6-10'), ex('Barbell Row', '3', '8'), ex('Hammer Curl', '3', '12')],
-  },
-  3: {
-    title: 'Legs',
-    rest: false,
-    bodyParts: ['quads', 'hamstrings', 'glutes', 'calves'],
-    exercises: [ex('Back Squat', '4', '5'), ex('Romanian Deadlift', '3', '8'), ex('Calf Raise', '4', '15')],
-  },
-  4: { title: 'Rest', rest: true, bodyParts: [], exercises: [] },
-  5: {
-    title: 'Upper',
-    rest: false,
-    bodyParts: ['chest', 'back', 'shoulders'],
-    exercises: [ex('Incline DB Press', '3', '10'), ex('Lat Pulldown', '3', '10'), ex('Lateral Raise', '3', '15')],
-  },
-  6: {
-    title: 'Lower + Core',
-    rest: false,
-    bodyParts: ['quads', 'glutes', 'abs'],
-    exercises: [ex('Leg Press', '4', '10'), ex('Hip Thrust', '3', '10'), ex('Hanging Leg Raise', '3', '12')],
-  },
-  0: { title: 'Rest', rest: true, bodyParts: [], exercises: [] },
+  0: emptyDay(),
+  1: emptyDay(),
+  2: emptyDay(),
+  3: emptyDay(),
+  4: emptyDay(),
+  5: emptyDay(),
+  6: emptyDay(),
 };
+
+/** True when a day has nothing planned at all. */
+export const isEmptyDay = (plan: DayPlan) =>
+  !plan.rest && !plan.title.trim() && plan.bodyParts.length === 0 && plan.exercises.length === 0;
 
 // ---- date helpers (local time, not UTC) ----
 

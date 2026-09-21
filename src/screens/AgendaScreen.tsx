@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetchSuggestions } from '../api';
+import { useAuth } from '../auth';
 import { BodyPartSelector, BodyPartTag, Button, Card } from '../components';
 import { newId, WEEK_ORDER, WEEKDAY_NAMES } from '../data';
 import { useStore } from '../store';
@@ -27,9 +28,9 @@ export default function AgendaScreen() {
   const today = new Date().getDay();
 
   const confirmReset = () =>
-    Alert.alert('Reset agenda?', 'This replaces your weekly plan with the starter Push/Pull/Legs split.', [
+    Alert.alert('Clear agenda?', 'Every day goes back to empty. Your logged workouts are not affected.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Reset', style: 'destructive', onPress: resetAgenda },
+      { text: 'Clear', style: 'destructive', onPress: resetAgenda },
     ]);
 
   return (
@@ -41,7 +42,9 @@ export default function AgendaScreen() {
             <Ionicons name="refresh" size={22} color={colors.textDim} />
           </Pressable>
         </View>
-        <Text style={styles.sub}>Tap a day to plan which muscles and exercises to hit.</Text>
+        <Text style={styles.sub}>
+          Optional: plan a day ahead of time. Leave it empty and Today will just ask what you feel like training.
+        </Text>
 
         {WEEK_ORDER.map((d) => {
           const plan = agenda[d];
@@ -56,7 +59,7 @@ export default function AgendaScreen() {
                   <Ionicons name="create-outline" size={18} color={colors.textFaint} />
                 </View>
                 <Text style={[styles.dayTitle, plan.rest && { color: colors.textDim }]}>
-                  {plan.rest ? `😴 ${plan.title || 'Rest'}` : plan.title || 'Untitled workout'}
+                  {plan.rest ? `😴 ${plan.title || 'Rest'}` : plan.title || 'Nothing planned'}
                 </Text>
                 {!plan.rest && plan.bodyParts.length > 0 && (
                   <View style={styles.tagRow}>
@@ -107,12 +110,13 @@ function DayEditor({
   const [sets, setSets] = useState('');
   const [reps, setReps] = useState('');
   const [suggesting, setSuggesting] = useState(false);
+  const { token } = useAuth();
 
   /** Fills the day from the API, keeping whatever is already listed. */
   const suggestExercises = async () => {
     setSuggesting(true);
     try {
-      const suggested = await fetchSuggestions(plan.bodyParts);
+      const suggested = await fetchSuggestions(plan.bodyParts, token);
       setPlan((prev) => {
         const have = new Set(prev.exercises.map((e) => e.name.toLowerCase()));
         const additions = suggested

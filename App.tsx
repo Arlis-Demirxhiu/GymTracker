@@ -3,8 +3,11 @@ import { StatusBar } from 'expo-status-bar';
 import { ComponentProps, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { AuthProvider, useAuth } from './src/auth';
 import AgendaScreen from './src/screens/AgendaScreen';
+import AuthScreen from './src/screens/AuthScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
+import OnboardingScreen from './src/screens/OnboardingScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import TodayScreen from './src/screens/TodayScreen';
 import { StoreProvider, useStore } from './src/store';
@@ -22,23 +25,56 @@ const TABS: { key: string; label: string; icon: IconName; iconOn: IconName; Scre
 export default function App() {
   return (
     <SafeAreaProvider>
-      <StoreProvider>
-        <StatusBar style="light" />
-        <Shell />
-      </StoreProvider>
+      <AuthProvider>
+        <StoreProvider>
+          <StatusBar style="light" />
+          <Gate />
+        </StoreProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }
 
+/** Sign in, then height and weight, then the app itself. */
+function Gate() {
+  const { ready, user } = useAuth();
+  const { ready: storeReady } = useStore();
+
+  if (!ready || !storeReady) {
+    return (
+      <SafeAreaView style={styles.root}>
+        <ActivityIndicator style={{ flex: 1 }} color={colors.accent} />
+      </SafeAreaView>
+    );
+  }
+
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.root} edges={['top', 'left', 'right', 'bottom']}>
+        <AuthScreen />
+      </SafeAreaView>
+    );
+  }
+
+  if (!user.profile.weightKg) {
+    return (
+      <SafeAreaView style={styles.root} edges={['top', 'left', 'right', 'bottom']}>
+        <OnboardingScreen />
+      </SafeAreaView>
+    );
+  }
+
+  return <Shell />;
+}
+
 function Shell() {
-  const { ready } = useStore();
   const [tab, setTab] = useState(TABS[0].key);
   const { Screen } = TABS.find((t) => t.key === tab)!;
 
   return (
     <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
       <View style={{ flex: 1 }}>
-        {ready ? <Screen /> : <ActivityIndicator style={{ flex: 1 }} color={colors.accent} />}
+        <Screen />
       </View>
       <SafeAreaView edges={['bottom']} style={styles.tabBar}>
         {TABS.map((t) => {

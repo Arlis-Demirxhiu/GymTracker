@@ -2,14 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSuggestions } from '../api';
+import { useAuth } from '../auth';
 import { BodyPartSelector, BodyPartTag, Button, Card, SectionTitle } from '../components';
-import { addDays, BODY_PARTS, daysBetween, formatDate, fromDateKey, toDateKey, WEEKDAY_NAMES } from '../data';
+import { addDays, BODY_PARTS, daysBetween, formatDate, fromDateKey, isEmptyDay, toDateKey, WEEKDAY_NAMES } from '../data';
 import { useStore } from '../store';
 import { colors, radius } from '../theme';
 import { BodyPart, Weekday } from '../types';
 
 export default function TodayScreen() {
-  const { agenda, logs, profile, saveLog, logForDate } = useStore();
+  const { agenda, logs, saveLog, logForDate } = useStore();
+  const { token, user } = useAuth();
+  const profile = user!.profile;
   const todayKey = toDateKey(new Date());
   const [dateKey, setDateKey] = useState(todayKey);
   const date = fromDateKey(dateKey);
@@ -32,13 +35,18 @@ export default function TodayScreen() {
   const toggle = (p: BodyPart) =>
     setSelected((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
 
-  const suggestions = useSuggestions(selected, { weightKg: profile.weightKg, level: profile.level });
+  // Suggestions follow the saved log, so they appear once the workout is logged.
+  const savedParts = existing?.bodyParts ?? [];
+  const suggestions = useSuggestions(savedParts, token, profile.level, profile.weightKg);
 
   const shiftDate = (n: number) => {
     const next = addDays(date, n);
     if (toDateKey(next) > todayKey) return;
     setDateKey(toDateKey(next));
   };
+
+  // Before anything is logged the screen simply asks what you feel like training.
+  const askWhatToTrain = savedParts.length === 0;
 
   // Days since each body part was last trained, relative to the real today.
   const recovery = useMemo(() => {
@@ -66,65 +74,44 @@ export default function TodayScreen() {
         </Pressable>
       </View>
 
-      <Card>
-        <SectionTitle>Planned</SectionTitle>
-        {plan.rest ? (
-          <View style={styles.restRow}>
-            <Ionicons name="bed-outline" size={22} color={colors.textDim} />
-            <Text style={styles.restText}>{plan.title || 'Rest day'} — recover and stretch.</Text>
-          </View>
-        ) : (
-          <>
-            <Text style={styles.planTitle}>{plan.title || 'Workout'}</Text>
-            <View style={styles.tagRow}>
-              {plan.bodyParts.map((p) => (
-                <BodyPartTag key={p} part={p} />
-              ))}
+      {!isEmptyDay(plan) && (
+        <Card>
+          <SectionTitle>Planned</SectionTitle>
+          {plan.rest ? (
+            <View style={styles.restRow}>
+              <Ionicons name="bed-outline" size={22} color={colors.textDim} />
+              <Text style={styles.restText}>{plan.title || 'Rest day'} — recover and stretch.</Text>
             </View>
-            {plan.exercises.map((e) => (
-              <View key={e.id} style={styles.exRow}>
-                <Text style={styles.exName}>{e.name}</Text>
-                <Text style={styles.exMeta}>
-                  {[e.sets && `${e.sets} sets`, e.reps && `${e.reps} reps`].filter(Boolean).join(' × ')}
-                </Text>
+          ) : (
+            <>
+              <Text style={styles.planTitle}>{plan.title || 'Workout'}</Text>
+              <View style={styles.tagRow}>
+                {plan.bodyParts.map((p) => (
+                  <BodyPartTag key={p} part={p} />
+                ))}
               </View>
-            ))}
-            {plan.bodyParts.length > 0 && (
-              <Button
-                label="Log planned workout"
-                variant="ghost"
-                style={{ marginTop: 12 }}
-                onPress={() => setSelected((prev) => Array.from(new Set([...prev, ...plan.bodyParts])))}
-              />
-            )}
-          </>
-        )}
-      </Card>
+              {plan.exercises.map((e) => (
+                <View key={e.id} style={styles.exRow}>
+                  <Text style={styles.exName}>{e.name}</Text>
+                  <Text style={styles.exMeta}>
+                    {[e.sets && `${e.sets} sets`, e.reps && `${e.reps} reps`].filter(Boolean).join(' × ')}
+                  </Text>
+                </View>
+              ))}
+              {plan.bodyParts.length > 0 && (
+                <Button
+                  label="Log planned workout"
+                  variant="ghost"
+                  style={{ marginTop: 12 }}
+                  onPress={() => setSelected((prev) => Array.from(new Set([...prev, ...plan.bodyParts])))}
+                />
+              )}
+            </>
+          )}
+        </Card>
+      )}
 
-      <Card>
-        <SectionTitle
-          right={existing && !dirty ? <Text style={styles.saved}>✓ Saved</Text> : undefined}
-        >
-          What did you train?
-        </SectionTitle>
-        <BodyPartSelector selected={selected} onToggle={toggle} planned={plan.rest ? [] : plan.bodyParts} />
-        <TextInput
-          value={note}
-          onChangeText={setNote}
-          placeholder="Notes (PRs, how it felt…)"
-          placeholderTextColor={colors.textFaint}
-          style={styles.input}
-          multiline
-        />
-        <Button
-          label={existing ? (selected.length || note.trim() ? 'Update log' : 'Clear log') : 'Save workout'}
-          onPress={() => saveLog(dateKey, selected, note)}
-          disabled={!dirty}
-          style={{ marginTop: 12 }}
-        />
-      </Card>
-
-      {selected.length > 0 && (
+      {savedParts.length > 0 && (
         <Card>
           <SectionTitle
             right={
@@ -137,7 +124,7 @@ export default function TodayScreen() {
               )
             }
           >
-            Suggested exercises
+            Your exercises
           </SectionTitle>
 
           {suggestions.error ? (
@@ -178,6 +165,29 @@ export default function TodayScreen() {
           )}
         </Card>
       )}
+
+      <Card>
+        <SectionTitle
+          right={existing && !dirty ? <Text style={styles.saved}>✓ Saved</Text> : undefined}
+        >
+          {askWhatToTrain ? 'What do you want to train today?' : 'What did you train?'}
+        </SectionTitle>
+        <BodyPartSelector selected={selected} onToggle={toggle} planned={plan.rest ? [] : plan.bodyParts} />
+        <TextInput
+          value={note}
+          onChangeText={setNote}
+          placeholder="Notes (PRs, how it felt…)"
+          placeholderTextColor={colors.textFaint}
+          style={styles.input}
+          multiline
+        />
+        <Button
+          label={existing ? (selected.length || note.trim() ? 'Update log' : 'Clear log') : 'Save workout'}
+          onPress={() => saveLog(dateKey, selected, note)}
+          disabled={!dirty}
+          style={{ marginTop: 12 }}
+        />
+      </Card>
 
       <Card>
         <SectionTitle>Last trained</SectionTitle>

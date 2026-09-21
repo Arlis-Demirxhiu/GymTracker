@@ -4,14 +4,15 @@ A React Native (Expo) app for tracking which body parts you train and planning a
 
 ## Features
 
-- **Today**: see today's planned workout, tap the muscles you trained, add a note, and save. Arrows let you log past days. A "Last trained" list shows how long it's been since you hit each body part (green: 0–3 days, amber: 4–6 days, red: 7+ days or never).
-- **Agenda**: plan Monday through Sunday. For each day, set a name, mark it as a rest day, pick the body parts, and add or reorder exercises with sets and reps. Starts with a Push/Pull/Legs split you can edit or reset.
+- **Accounts**: sign up and sign in against your own [API](#api). Your height, weight and experience live with the account; workouts stay on the device, namespaced per account so two people can share a phone.
+- **Today**: nothing is planned to begin with — the screen simply asks what you want to train and shows the body map. Tap the muscles, save, and the exercises to do appear at the top with the weight to use. Arrows let you log past days. A "Last trained" list shows how long it's been since you hit each body part (green: 0–3 days, amber: 4–6 days, red: 7+ days or never).
+- **Agenda**: optional. Plan Monday through Sunday if you want to: set a name, mark a rest day, pick the body parts, and add or reorder exercises with sets and reps (or fill a day from the API in one tap). Every day starts empty.
 - **Body map**: pick muscles by tapping a front/back figure instead of a list (the list is still one tap away, and cardio stays a chip).
 - **Suggested exercises**: the muscles you select are sent to the [exercise API](#api), which answers with up to six exercises — shown on Today, and addable to any agenda day with one button.
 - **You**: your height, weight and experience level. The weight and level turn each suggested exercise into a starting kg (`2 × 16 kg` for dumbbells, `Bodyweight` where nothing is loaded); height is only used for BMI.
 - **History**: a weekly strip with day-by-day dots, sessions per body part over 7, 30, or 90 days, and a list of every workout (each one can be deleted).
 
-Data is stored on the device with AsyncStorage.
+Your profile lives on the server with your account; agenda and workout logs are stored on the device with AsyncStorage, under a key per account.
 
 ## Run
 
@@ -22,7 +23,7 @@ npx expo start
 
 Scan the QR code with **Expo Go** on your phone, or press `i` for the iOS simulator (needs Xcode), `a` for the Android emulator, or `w` for the web.
 
-Start the exercise API in a second terminal, otherwise the suggestion cards show a "couldn't reach the server" message:
+Start the API in a second terminal — the app cannot sign in without it:
 
 ```bash
 cd server
@@ -42,9 +43,22 @@ A small Express server (`server/`) that suggests exercises for a set of body par
 
 | Endpoint | Description |
 | --- | --- |
+| `POST /auth/signup` | `{ email, password }` → `{ token, user }` |
+| `POST /auth/login` | `{ email, password }` → `{ token, user }` |
+| `POST /auth/logout` | Revokes the token it is called with |
+| `GET /me` | The signed-in account |
+| `PATCH /me` | `{ heightCm, weightKg, level }` |
 | `GET /health` | `{ "ok": true }` |
 | `GET /body-parts` | Every body part the API accepts |
 | `GET /exercises?parts=chest,triceps` | Up to 6 exercises covering those parts |
+
+Authenticated calls carry `Authorization: Bearer <token>`. A signed-in `/exercises` call uses the account's saved bodyweight and level, so the query needs only `parts`.
+
+### Accounts
+
+Passwords are hashed with scrypt and a per-user salt; the hash never leaves the server, and the API returns the same "Email or password is wrong" whether or not the email exists. Five failed sign-ins lock an email for a minute. Tokens are 32 random bytes, valid for 30 days, revoked on sign-out. The app keeps its token in the iOS/Android keychain (`expo-secure-store`); the web build falls back to browser storage.
+
+Accounts live in `server/data/db.json` (git-ignored, written atomically, created on first signup). That is deliberately simple, and it is enough for a server on your own network. **Before putting this anywhere public, put it behind HTTPS** — over plain HTTP, passwords and tokens travel in the clear — and move the file to a real database.
 
 `/exercises` parameters:
 
@@ -101,14 +115,17 @@ cd server && npm test
 
 ```
 App.tsx                  Tab shell (Today / Agenda / History)
-src/store.tsx            State + AsyncStorage persistence
+src/store.tsx            Per-account agenda + logs in AsyncStorage
 src/data.ts              Body parts, default agenda, date helpers
 src/components.tsx       Card, BodyPartTag, BodyPartSelector, Button
 src/BodyMap.tsx          Tappable front/back muscle figure (SVG)
 src/api.ts               Client for the exercise API
-src/screens/             TodayScreen, AgendaScreen, HistoryScreen, ProfileScreen
+src/auth.tsx             Session: sign in/up/out, token storage, profile
+src/screens/             Auth, Onboarding, Today, Agenda, History, Profile
 server/src/catalog.ts    Exercise catalog
 server/src/select.ts     Picks up to six exercises for the chosen parts
 server/src/load.ts       Turns bodyweight + experience into a working weight
+server/src/users.ts      Accounts, password hashing, tokens, JSON persistence
+server/src/auth.ts       Bearer-token middleware and sign-in throttling
 server/src/index.ts      Express routes
 ```
