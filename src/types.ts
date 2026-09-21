@@ -38,3 +38,12 @@ export type WorkoutLog = {
   bodyParts: BodyPart[];
   note: string;
 };
+
+export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
+
+export type Profile = {
+  /** Centimetres. Used for BMI only — it does not change suggested weights. */
+  heightCm: number | null;
+  weightKg: number | null;
+  level: ExperienceLevel;
+};

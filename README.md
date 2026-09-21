@@ -8,6 +8,7 @@ A React Native (Expo) app for tracking which body parts you train and planning a
 - **Agenda**: plan Monday through Sunday. For each day, set a name, mark it as a rest day, pick the body parts, and add or reorder exercises with sets and reps. Starts with a Push/Pull/Legs split you can edit or reset.
 - **Body map**: pick muscles by tapping a front/back figure instead of a list (the list is still one tap away, and cardio stays a chip).
 - **Suggested exercises**: the muscles you select are sent to the [exercise API](#api), which answers with up to six exercises — shown on Today, and addable to any agenda day with one button.
+- **You**: your height, weight and experience level. The weight and level turn each suggested exercise into a starting kg (`2 × 16 kg` for dumbbells, `Bodyweight` where nothing is loaded); height is only used for BMI.
 - **History**: a weekly strip with day-by-day dots, sessions per body part over 7, 30, or 90 days, and a list of every workout (each one can be deleted).
 
 Data is stored on the device with AsyncStorage.
@@ -45,10 +46,19 @@ A small Express server (`server/`) that suggests exercises for a set of body par
 | `GET /body-parts` | Every body part the API accepts |
 | `GET /exercises?parts=chest,triceps` | Up to 6 exercises covering those parts |
 
-`/exercises` takes a comma-separated `parts` list and an optional `limit` (1–6, default 6). Unknown parts or a limit out of range return 400.
+`/exercises` parameters:
+
+| Parameter | Meaning |
+| --- | --- |
+| `parts` | Comma-separated body parts (required) |
+| `limit` | 1–6, default 6 |
+| `bodyweight` | Kilograms, 30–300. Adds a `suggestedLoad` to each exercise |
+| `level` | `beginner` (default), `intermediate` or `advanced` |
+
+Anything outside those ranges returns 400.
 
 ```bash
-curl "localhost:3001/exercises?parts=chest,triceps&limit=4"
+curl "localhost:3001/exercises?parts=chest,triceps&limit=4&bodyweight=82"
 ```
 
 ```json
@@ -64,13 +74,22 @@ curl "localhost:3001/exercises?parts=chest,triceps&limit=4"
       "equipment": "barbell",
       "compound": true,
       "sets": "4",
-      "reps": "6-8"
+      "reps": "6-8",
+      "suggestedLoad": { "kg": 45, "perHand": false, "label": "45 kg" }
     }
   ]
 }
 ```
 
 Requested parts take turns, least-covered first, so two muscles get three exercises each rather than six for whichever came first; an exercise that also trains another requested muscle counts as half a turn for it. Compound lifts come before isolation work.
+
+### Suggested weights
+
+Every exercise carries a share of bodyweight that suits a beginner — bench press 0.55, back squat 0.70, lateral raise 0.06 per hand — which is scaled by experience (intermediate ×1.35, advanced ×1.7) and rounded to loadable increments: 2.5 kg for barbells and stacks, 2 kg for dumbbells, never below an empty 20 kg bar. Bodyweight and cardio movements return no weight.
+
+Height is not part of this. It hardly predicts strength, so the app collects it for BMI only.
+
+**These are starting estimates, not prescriptions.** Technique, leverages, sleep and the day matter more than any formula — warm up, adjust, and stop if form breaks down.
 
 Run the tests with:
 
@@ -87,8 +106,9 @@ src/data.ts              Body parts, default agenda, date helpers
 src/components.tsx       Card, BodyPartTag, BodyPartSelector, Button
 src/BodyMap.tsx          Tappable front/back muscle figure (SVG)
 src/api.ts               Client for the exercise API
-src/screens/             TodayScreen, AgendaScreen, HistoryScreen
+src/screens/             TodayScreen, AgendaScreen, HistoryScreen, ProfileScreen
 server/src/catalog.ts    Exercise catalog
 server/src/select.ts     Picks up to six exercises for the chosen parts
+server/src/load.ts       Turns bodyweight + experience into a working weight
 server/src/index.ts      Express routes
 ```

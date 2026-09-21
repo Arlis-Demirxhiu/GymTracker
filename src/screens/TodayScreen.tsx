@@ -9,7 +9,7 @@ import { colors, radius } from '../theme';
 import { BodyPart, Weekday } from '../types';
 
 export default function TodayScreen() {
-  const { agenda, logs, saveLog, logForDate } = useStore();
+  const { agenda, logs, profile, saveLog, logForDate } = useStore();
   const todayKey = toDateKey(new Date());
   const [dateKey, setDateKey] = useState(todayKey);
   const date = fromDateKey(dateKey);
@@ -32,7 +32,7 @@ export default function TodayScreen() {
   const toggle = (p: BodyPart) =>
     setSelected((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
 
-  const suggestions = useSuggestions(selected);
+  const suggestions = useSuggestions(selected, { weightKg: profile.weightKg, level: profile.level });
 
   const shiftDate = (n: number) => {
     const next = addDays(date, n);
@@ -146,17 +146,35 @@ export default function TodayScreen() {
               <Button label="Try again" variant="ghost" onPress={suggestions.reload} style={{ marginTop: 10 }} />
             </View>
           ) : (
-            suggestions.exercises.map((e) => (
-              <View key={e.id} style={styles.exRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.exName}>{e.name}</Text>
-                  <Text style={styles.exSub}>{e.equipment}</Text>
+            <>
+              {suggestions.exercises.map((e) => (
+                <View key={e.id} style={styles.exRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.exName}>{e.name}</Text>
+                    <Text style={styles.exSub}>{e.equipment}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    {!!e.suggestedLoad && (
+                      <Text style={[styles.exLoad, e.suggestedLoad.kg === null && { color: colors.textDim }]}>
+                        {e.suggestedLoad.label}
+                      </Text>
+                    )}
+                    <Text style={styles.exMeta}>
+                      {[e.sets && `${e.sets} sets`, e.reps && `${e.reps} reps`].filter(Boolean).join(' × ')}
+                    </Text>
+                  </View>
                 </View>
-                <Text style={styles.exMeta}>
-                  {[e.sets && `${e.sets} sets`, e.reps && `${e.reps} reps`].filter(Boolean).join(' × ')}
-                </Text>
-              </View>
-            ))
+              ))}
+              {suggestions.exercises.length > 0 &&
+                (profile.weightKg ? (
+                  <Text style={styles.loadNote}>
+                    Starting weights for a {profile.level} at {profile.weightKg} kg — warm up first and adjust to your
+                    own strength.
+                  </Text>
+                ) : (
+                  <Text style={styles.loadNote}>Add your weight on the You tab to get a starting kg for each lift.</Text>
+                ))}
+            </>
           )}
         </Card>
       )}
@@ -202,6 +220,8 @@ const styles = StyleSheet.create({
   exSub: { color: colors.textFaint, fontSize: 12, marginTop: 2, textTransform: 'capitalize' },
   exMeta: { color: colors.textDim, fontSize: 14, marginLeft: 12 },
   errText: { color: colors.textDim, fontSize: 14 },
+  exLoad: { color: colors.accent, fontSize: 15, fontWeight: '700' },
+  loadNote: { color: colors.textFaint, fontSize: 11, lineHeight: 16, marginTop: 12 },
   restRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   restText: { color: colors.textDim, fontSize: 15, flexShrink: 1 },
   saved: { color: colors.accent, fontWeight: '700', fontSize: 13 },

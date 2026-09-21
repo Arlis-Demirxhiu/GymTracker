@@ -1,6 +1,7 @@
 import cors from 'cors';
 import express from 'express';
 import { BODY_PARTS, isBodyPart, type BodyPart } from './catalog.ts';
+import { isLevel, LEVELS, MAX_BODYWEIGHT, MIN_BODYWEIGHT, withLoads, type Level } from './load.ts';
 import { MAX_EXERCISES, selectExercises } from './select.ts';
 
 const app = express();
@@ -43,9 +44,38 @@ app.get('/exercises', (req, res) => {
     }
   }
 
+  // Weights are optional: without a bodyweight we simply suggest the movements.
+  let bodyweight: number | null = null;
+  if (req.query.bodyweight !== undefined) {
+    bodyweight = Number(req.query.bodyweight);
+    if (!Number.isFinite(bodyweight) || bodyweight < MIN_BODYWEIGHT || bodyweight > MAX_BODYWEIGHT) {
+      return res.status(400).json({ error: `bodyweight must be between ${MIN_BODYWEIGHT} and ${MAX_BODYWEIGHT} kg` });
+    }
+  }
+
+  let level: Level = 'beginner';
+  if (req.query.level !== undefined) {
+    const raw = String(req.query.level).toLowerCase();
+    if (!isLevel(raw)) return res.status(400).json({ error: `level must be one of ${LEVELS.join(', ')}` });
+    level = raw;
+  }
+
   const parts = requested as BodyPart[];
-  const exercises = selectExercises(parts, limit);
-  res.json({ parts, count: exercises.length, exercises });
+  const picked = selectExercises(parts, limit);
+  const exercises = bodyweight === null ? picked : withLoads(picked, bodyweight, level);
+
+  res.json({
+    parts,
+    count: exercises.length,
+    ...(bodyweight === null
+      ? {}
+      : {
+          level,
+          bodyweightKg: bodyweight,
+          disclaimer: 'Starting estimates from bodyweight and experience. Warm up and adjust — stop if form breaks down.',
+        }),
+    exercises,
+  });
 });
 
 app.use((_req, res) => {

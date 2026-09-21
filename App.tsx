@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import AgendaScreen from './src/screens/AgendaScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
 import TodayScreen from './src/screens/TodayScreen';
 import { StoreProvider, useStore } from './src/store';
 import { colors } from './src/theme';
@@ -15,6 +16,7 @@ const TABS: { key: string; label: string; icon: IconName; iconOn: IconName; Scre
   { key: 'today', label: 'Today', icon: 'barbell-outline', iconOn: 'barbell', Screen: TodayScreen },
   { key: 'agenda', label: 'Agenda', icon: 'calendar-outline', iconOn: 'calendar', Screen: AgendaScreen },
   { key: 'history', label: 'History', icon: 'stats-chart-outline', iconOn: 'stats-chart', Screen: HistoryScreen },
+  { key: 'profile', label: 'You', icon: 'person-outline', iconOn: 'person', Screen: ProfileScreen },
 ];
 
 export default function App() {
