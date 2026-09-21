@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BodyPartPicker, BodyPartTag, Button, Card } from '../components';
+import { BodyPartSelector, BodyPartTag, Button, Card } from '../components';
 import { newId, WEEK_ORDER, WEEKDAY_NAMES } from '../data';
 import { useStore } from '../store';
 import { colors, radius } from '../theme';
@@ -171,7 +171,7 @@ function DayEditor({
             {!plan.rest && (
               <>
                 <Text style={styles.label}>Body parts</Text>
-                <BodyPartPicker selected={plan.bodyParts} onToggle={toggle} />
+                <BodyPartSelector selected={plan.bodyParts} onToggle={toggle} />
 
                 <Text style={[styles.label, { marginTop: 24 }]}>Exercises</Text>
                 {plan.exercises.length === 0 && <Text style={styles.empty}>No exercises yet — add one below.</Text>}

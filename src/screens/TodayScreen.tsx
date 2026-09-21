@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { BodyPartPicker, BodyPartTag, Button, Card, SectionTitle } from '../components';
+import { BodyPartSelector, BodyPartTag, Button, Card, SectionTitle } from '../components';
 import { addDays, BODY_PARTS, daysBetween, formatDate, fromDateKey, toDateKey, WEEKDAY_NAMES } from '../data';
 import { useStore } from '../store';
 import { colors, radius } from '../theme';
@@ -104,7 +104,7 @@ export default function TodayScreen() {
         >
           What did you train?
         </SectionTitle>
-        <BodyPartPicker selected={selected} onToggle={toggle} planned={plan.rest ? [] : plan.bodyParts} />
+        <BodyPartSelector selected={selected} onToggle={toggle} planned={plan.rest ? [] : plan.bodyParts} />
         <TextInput
           value={note}
           onChangeText={setNote}

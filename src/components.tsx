@@ -1,5 +1,6 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { BodyMap, MAPPED_PARTS } from './BodyMap';
 import { BODY_PART_MAP, BODY_PARTS } from './data';
 import { colors, radius } from './theme';
 import { BodyPart } from './types';
@@ -27,18 +28,49 @@ export function BodyPartTag({ part, small }: { part: BodyPart; small?: boolean }
   );
 }
 
+/**
+ * Body figure first, chip list as a fallback. Parts the figure can't show
+ * (cardio) stay reachable as chips underneath it.
+ */
+export function BodyPartSelector(props: { selected: BodyPart[]; onToggle: (p: BodyPart) => void; planned?: BodyPart[] }) {
+  const [mode, setMode] = useState<'body' | 'list'>('body');
+  const offMap = BODY_PARTS.filter((bp) => !MAPPED_PARTS.includes(bp.key)).map((bp) => bp.key);
+
+  return (
+    <View>
+      <Pressable onPress={() => setMode(mode === 'body' ? 'list' : 'body')} hitSlop={8} style={styles.modeRow}>
+        <Text style={styles.modeText}>{mode === 'body' ? 'Use list instead' : 'Use body map instead'}</Text>
+      </Pressable>
+
+      {mode === 'body' ? (
+        <>
+          <BodyMap {...props} />
+          <View style={[styles.grid, { marginTop: 10, justifyContent: 'center' }]}>
+            <BodyPartPicker {...props} only={offMap} />
+          </View>
+        </>
+      ) : (
+        <BodyPartPicker {...props} />
+      )}
+    </View>
+  );
+}
+
 export function BodyPartPicker({
   selected,
   onToggle,
   planned = [],
+  only,
 }: {
   selected: BodyPart[];
   onToggle: (p: BodyPart) => void;
   planned?: BodyPart[];
+  only?: BodyPart[];
 }) {
+  const parts = only ? BODY_PARTS.filter((bp) => only.includes(bp.key)) : BODY_PARTS;
   return (
     <View style={styles.grid}>
-      {BODY_PARTS.map((bp) => {
+      {parts.map((bp) => {
         const on = selected.includes(bp.key);
         const isPlanned = planned.includes(bp.key);
         return (
@@ -127,6 +159,8 @@ const styles = StyleSheet.create({
   tagText: { color: colors.text, fontSize: 13, fontWeight: '600' },
   dot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  modeRow: { alignSelf: 'flex-end', marginBottom: 6 },
+  modeText: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
