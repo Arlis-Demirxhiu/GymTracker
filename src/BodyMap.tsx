@@ -135,10 +135,12 @@ export function BodyMap({
       <Path
         key={key}
         d={d}
-        fill={on ? color : isPlanned ? color + '33' : colors.muscle}
-        stroke={on ? '#FFFFFF80' : isPlanned ? color + 'AA' : colors.muscleLine}
-        strokeWidth={1.2}
-        strokeDasharray={isPlanned ? '4 3' : undefined}
+        fill={on || isPlanned ? color : colors.muscle}
+        fillOpacity={isPlanned ? 0.22 : 1}
+        stroke={on ? '#FFFFFF' : isPlanned ? color : colors.muscleLine}
+        strokeOpacity={on ? 0.5 : 1}
+        strokeWidth={isPlanned ? 1.5 : 1.2}
+        strokeDasharray={isPlanned ? [4, 3] : undefined}
         onPress={() => onToggle(part)}
         accessibilityLabel={`${BODY_PART_MAP[part].label}${on ? ', selected' : ''}`}
       />
