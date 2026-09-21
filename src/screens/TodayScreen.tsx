@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSuggestions } from '../api';
 import { BodyPartSelector, BodyPartTag, Button, Card, SectionTitle } from '../components';
 import { addDays, BODY_PARTS, daysBetween, formatDate, fromDateKey, toDateKey, WEEKDAY_NAMES } from '../data';
 import { useStore } from '../store';
@@ -30,6 +31,8 @@ export default function TodayScreen() {
 
   const toggle = (p: BodyPart) =>
     setSelected((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+
+  const suggestions = useSuggestions(selected);
 
   const shiftDate = (n: number) => {
     const next = addDays(date, n);
@@ -121,6 +124,43 @@ export default function TodayScreen() {
         />
       </Card>
 
+      {selected.length > 0 && (
+        <Card>
+          <SectionTitle
+            right={
+              suggestions.loading ? (
+                <ActivityIndicator size="small" color={colors.accent} />
+              ) : (
+                <Pressable onPress={suggestions.reload} hitSlop={10}>
+                  <Ionicons name="refresh" size={18} color={colors.textDim} />
+                </Pressable>
+              )
+            }
+          >
+            Suggested exercises
+          </SectionTitle>
+
+          {suggestions.error ? (
+            <View>
+              <Text style={styles.errText}>{suggestions.error}</Text>
+              <Button label="Try again" variant="ghost" onPress={suggestions.reload} style={{ marginTop: 10 }} />
+            </View>
+          ) : (
+            suggestions.exercises.map((e) => (
+              <View key={e.id} style={styles.exRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.exName}>{e.name}</Text>
+                  <Text style={styles.exSub}>{e.equipment}</Text>
+                </View>
+                <Text style={styles.exMeta}>
+                  {[e.sets && `${e.sets} sets`, e.reps && `${e.reps} reps`].filter(Boolean).join(' × ')}
+                </Text>
+              </View>
+            ))
+          )}
+        </Card>
+      )}
+
       <Card>
         <SectionTitle>Last trained</SectionTitle>
         {recovery.map((r) => (
@@ -159,7 +199,9 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   exName: { color: colors.text, fontSize: 15, flexShrink: 1 },
+  exSub: { color: colors.textFaint, fontSize: 12, marginTop: 2, textTransform: 'capitalize' },
   exMeta: { color: colors.textDim, fontSize: 14, marginLeft: 12 },
+  errText: { color: colors.textDim, fontSize: 14 },
   restRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   restText: { color: colors.textDim, fontSize: 15, flexShrink: 1 },
   saved: { color: colors.accent, fontWeight: '700', fontSize: 13 },

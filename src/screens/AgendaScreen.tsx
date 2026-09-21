@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { fetchSuggestions } from '../api';
 import { BodyPartSelector, BodyPartTag, Button, Card } from '../components';
 import { newId, WEEK_ORDER, WEEKDAY_NAMES } from '../data';
 import { useStore } from '../store';
@@ -105,6 +106,26 @@ function DayEditor({
   const [exName, setExName] = useState('');
   const [sets, setSets] = useState('');
   const [reps, setReps] = useState('');
+  const [suggesting, setSuggesting] = useState(false);
+
+  /** Fills the day from the API, keeping whatever is already listed. */
+  const suggestExercises = async () => {
+    setSuggesting(true);
+    try {
+      const suggested = await fetchSuggestions(plan.bodyParts);
+      setPlan((prev) => {
+        const have = new Set(prev.exercises.map((e) => e.name.toLowerCase()));
+        const additions = suggested
+          .filter((s) => !have.has(s.name.toLowerCase()))
+          .map((s) => ({ id: newId(), name: s.name, sets: s.sets, reps: s.reps }));
+        return { ...prev, exercises: [...prev.exercises, ...additions] };
+      });
+    } catch {
+      Alert.alert('No suggestions', "Couldn't reach the exercise server. Check that it is running.");
+    } finally {
+      setSuggesting(false);
+    }
+  };
 
   const toggle = (p: BodyPart) =>
     setPlan((prev) => ({
@@ -174,6 +195,13 @@ function DayEditor({
                 <BodyPartSelector selected={plan.bodyParts} onToggle={toggle} />
 
                 <Text style={[styles.label, { marginTop: 24 }]}>Exercises</Text>
+                <Button
+                  label={suggesting ? 'Finding exercises…' : '✨ Suggest exercises'}
+                  variant="ghost"
+                  onPress={suggestExercises}
+                  disabled={suggesting || plan.bodyParts.length === 0}
+                  style={{ marginBottom: 10 }}
+                />
                 {plan.exercises.length === 0 && <Text style={styles.empty}>No exercises yet — add one below.</Text>}
                 {plan.exercises.map((e, i) => (
                   <View key={e.id} style={styles.exItem}>
