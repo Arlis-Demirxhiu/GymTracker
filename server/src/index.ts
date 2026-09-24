@@ -1,9 +1,9 @@
 import cors from 'cors';
 import express from 'express';
 import { clearFailures, lockedFor, optionalAuth, recordFailure, requireAuth } from './auth.ts';
-import { BODY_PARTS, isBodyPart, type BodyPart } from './catalog.ts';
+import { BODY_PARTS, equipmentLabel, GEAR, isBodyPart, isGear, type BodyPart, type Gear } from './catalog.ts';
 import { isLevel, LEVELS, MAX_BODYWEIGHT, MIN_BODYWEIGHT, withLoads, type Level } from './load.ts';
-import { MAX_EXERCISES, selectExercises } from './select.ts';
+import { MAX_EXERCISES, selectExercises, uncoveredParts } from './select.ts';
 import {
   createUser,
   findByEmail,
@@ -30,6 +30,10 @@ app.get('/health', (_req, res) => {
 
 app.get('/body-parts', (_req, res) => {
   res.json({ bodyParts: BODY_PARTS });
+});
+
+app.get('/equipment', (_req, res) => {
+  res.json({ equipment: GEAR });
 });
 
 // ---- accounts ----
@@ -79,8 +83,8 @@ app.get('/me', requireAuth, (req, res) => {
 });
 
 app.patch('/me', requireAuth, async (req, res) => {
-  const { heightCm, weightKg, level } = req.body ?? {};
-  const patch: { heightCm?: number | null; weightKg?: number | null; level?: Level } = {};
+  const { heightCm, weightKg, level, equipment } = req.body ?? {};
+  const patch: { heightCm?: number | null; weightKg?: number | null; level?: Level; equipment?: Gear[] } = {};
 
   if (heightCm !== undefined) {
     if (heightCm !== null && (typeof heightCm !== 'number' || heightCm < MIN_HEIGHT || heightCm > MAX_HEIGHT)) {
@@ -99,6 +103,12 @@ app.patch('/me', requireAuth, async (req, res) => {
       return res.status(400).json({ error: `level must be one of ${LEVELS.join(', ')}` });
     }
     patch.level = level;
+  }
+  if (equipment !== undefined) {
+    if (!Array.isArray(equipment) || !equipment.every((g) => typeof g === 'string' && isGear(g))) {
+      return res.status(400).json({ error: 'equipment must be a list of known equipment', allowed: GEAR });
+    }
+    patch.equipment = equipment;
   }
 
   const updated = await updateProfile(req.user!.id, patch);
@@ -151,13 +161,31 @@ app.get('/exercises', optionalAuth, (req, res) => {
     level = rawLevel;
   }
 
+  // An explicit ?equipment= wins (empty means bodyweight only); otherwise the
+  // account's kit; anonymous callers get a full gym.
+  let available: Gear[] | undefined = req.user?.profile.equipment;
+  if (req.query.equipment !== undefined) {
+    const list = String(req.query.equipment)
+      .split(',')
+      .map((g) => g.trim().toLowerCase())
+      .filter(Boolean);
+    const unknownGear = list.filter((g) => !isGear(g));
+    if (unknownGear.length > 0) {
+      return res.status(400).json({ error: `Unknown equipment: ${unknownGear.join(', ')}`, allowed: GEAR });
+    }
+    available = list as Gear[];
+  }
+
   const parts = requested as BodyPart[];
-  const picked = selectExercises(parts, limit);
-  const exercises = bodyweight === null ? picked : withLoads(picked, bodyweight, level);
+  const picked = selectExercises(parts, limit, available);
+  const loaded = bodyweight === null ? picked : withLoads(picked, bodyweight, level);
+  const exercises = loaded.map((x) => ({ ...x, equipment: equipmentLabel(x.requires) }));
 
   res.json({
     parts,
     count: exercises.length,
+    /** Requested muscles that nothing in the lifter's kit can train. */
+    uncovered: uncoveredParts(parts, available),
     ...(bodyweight === null
       ? {}
       : {

@@ -116,7 +116,7 @@ function DayEditor({
   const suggestExercises = async () => {
     setSuggesting(true);
     try {
-      const suggested = await fetchSuggestions(plan.bodyParts, token);
+      const { exercises: suggested } = await fetchSuggestions(plan.bodyParts, token);
       setPlan((prev) => {
         const have = new Set(prev.exercises.map((e) => e.name.toLowerCase()));
         const additions = suggested

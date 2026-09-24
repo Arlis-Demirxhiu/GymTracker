@@ -1,4 +1,4 @@
-import { Agenda, BodyPart, DayPlan, Weekday } from './types';
+import { Agenda, BodyPart, DayPlan, Gear, Profile, Weekday } from './types';
 
 export const BODY_PARTS: { key: BodyPart; label: string; color: string }[] = [
   { key: 'chest', label: 'Chest', color: '#FF6B6B' },
@@ -29,6 +29,34 @@ export const WEEKDAY_NAMES = [
   'Friday',
   'Saturday',
 ] as const;
+
+// ---- equipment ----
+
+/** Icons are MaterialCommunityIcons names. */
+export const GEAR_OPTIONS: { key: Gear; label: string; icon: string }[] = [
+  { key: 'barbell', label: 'Barbell & plates', icon: 'weight-lifter' },
+  { key: 'dumbbell', label: 'Dumbbells', icon: 'dumbbell' },
+  { key: 'kettlebell', label: 'Kettlebell', icon: 'kettlebell' },
+  { key: 'bench', label: 'Bench', icon: 'bench' },
+  { key: 'machine', label: 'Weight machines', icon: 'weight-kilogram' },
+  { key: 'cable', label: 'Cable machine', icon: 'cable-data' },
+  { key: 'pullup-bar', label: 'Pull-up bar', icon: 'gymnastics' },
+  { key: 'dip-bars', label: 'Dip bars', icon: 'arm-flex' },
+  { key: 'cardio-machine', label: 'Cardio machines', icon: 'bike' },
+  { key: 'jump-rope', label: 'Jump rope', icon: 'jump-rope' },
+  { key: 'ab-wheel', label: 'Ab wheel', icon: 'tire' },
+];
+
+export const ALL_GEAR: Gear[] = GEAR_OPTIONS.map((g) => g.key);
+
+/** Starting points; the toggles fine-tune from there. */
+export const EQUIPMENT_PRESETS: { key: string; label: string; icon: string; gear: Gear[] }[] = [
+  { key: 'gym', label: 'Full gym', icon: 'office-building', gear: ALL_GEAR },
+  { key: 'home', label: 'Dumbbells at home', icon: 'home-variant', gear: ['dumbbell'] },
+  { key: 'none', label: 'No equipment', icon: 'human-handsup', gear: [] },
+];
+
+export const DEFAULT_PROFILE: Profile = { heightCm: null, weightKg: null, level: 'beginner', equipment: ALL_GEAR };
 
 /** Display order: Monday first. */
 export const WEEK_ORDER: Weekday[] = [1, 2, 3, 4, 5, 6, 0];

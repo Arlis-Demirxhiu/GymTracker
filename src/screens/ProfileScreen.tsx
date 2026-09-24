@@ -2,15 +2,16 @@ import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { describe } from '../api';
 import { useAuth } from '../auth';
-import { BodyInputs, LevelPicker } from '../BodyInputs';
+import { BodyInputs, EquipmentPicker, LevelPicker } from '../BodyInputs';
 import { Button, Card, SectionTitle } from '../components';
 import { getHealthSummary, isHealthAvailable, requestHealthAccess } from '../health';
+import { DEFAULT_PROFILE } from '../data';
 import { colors } from '../theme';
 import { Profile } from '../types';
 
 export default function ProfileScreen() {
   const { user, updateProfile, signOut } = useAuth();
-  const profile: Profile = user?.profile ?? { heightCm: null, weightKg: null, level: 'beginner' };
+  const profile: Profile = user?.profile ?? DEFAULT_PROFILE;
   const [error, setError] = useState<string | null>(null);
 
   const save = (patch: Partial<Profile>) => {
@@ -84,6 +85,11 @@ export default function ProfileScreen() {
       <Card>
         <SectionTitle>Experience</SectionTitle>
         <LevelPicker value={profile.level} onChange={(level) => save({ level })} />
+      </Card>
+
+      <Card>
+        <SectionTitle>Equipment</SectionTitle>
+        <EquipmentPicker value={profile.equipment} onChange={(equipment) => save({ equipment })} />
       </Card>
 
       <Card>

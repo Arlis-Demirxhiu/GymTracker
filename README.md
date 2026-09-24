@@ -9,6 +9,7 @@ A React Native (Expo) app for tracking which body parts you train and planning a
 - **Agenda**: optional. Plan Monday through Sunday if you want to: set a name, mark a rest day, pick the body parts, and add or reorder exercises with sets and reps (or fill a day from the API in one tap). Every day starts empty.
 - **Body map**: pick muscles by tapping a front/back figure instead of a list (the list is still one tap away, and cardio stays a chip).
 - **Suggested exercises**: the muscles you select are sent to the [exercise API](#api), which answers with up to six exercises — shown on Today, and addable to any agenda day with one button.
+- **Equipment**: tell the app what you have — a full gym, dumbbells at home, nothing at all, or any mix of barbell, dumbbells, kettlebell, bench, machines, cables, pull-up bar, dip bars, cardio machines, jump rope and ab wheel. Suggestions only use exercises you can actually do, and the app says so when your kit can't train a muscle (biceps with no equipment, for example). Asked once at sign-up, changeable on the You tab.
 - **You**: your height, weight and experience level. The weight and level turn each suggested exercise into a starting kg (`2 × 16 kg` for dumbbells, `Bodyweight` where nothing is loaded); height is only used for BMI.
 - **Apple Health**: today's active and total calories, steps, exercise minutes and resting heart rate on the Today screen, and a one-tap import of your height and weight on the You tab. Read-only — nothing is written back to Health.
 - **History**: a weekly strip with day-by-day dots, sessions per body part over 7, 30, or 90 days, and a list of every workout (each one can be deleted).
@@ -57,12 +58,15 @@ A small Express server (`server/`) that suggests exercises for a set of body par
 | `POST /auth/login` | `{ email, password }` → `{ token, user }` |
 | `POST /auth/logout` | Revokes the token it is called with |
 | `GET /me` | The signed-in account |
-| `PATCH /me` | `{ heightCm, weightKg, level }` |
+| `PATCH /me` | `{ heightCm, weightKg, level, equipment }` |
 | `GET /health` | `{ "ok": true }` |
 | `GET /body-parts` | Every body part the API accepts |
+| `GET /equipment` | Every piece of equipment the API knows |
 | `GET /exercises?parts=chest,triceps` | Up to 6 exercises covering those parts |
 
-Authenticated calls carry `Authorization: Bearer <token>`. A signed-in `/exercises` call uses the account's saved bodyweight and level, so the query needs only `parts`.
+Authenticated calls carry `Authorization: Bearer <token>`. A signed-in `/exercises` call uses the account's saved bodyweight, level and equipment, so the query needs only `parts`. Anonymous calls assume a full gym.
+
+Every exercise lists everything it needs — a barbell bench press needs a barbell *and* a bench, a pull-up needs a pull-up bar — and is only suggested when you have all of it. The response's `uncovered` array names requested muscles your equipment can't train, and each exercise carries an `equipment` label such as `"Dumbbells + Bench"` or `"Bodyweight"`.
 
 ### Accounts
 
@@ -78,6 +82,7 @@ Accounts live in `server/data/db.json` (git-ignored, written atomically, created
 | `limit` | 1–6, default 6 |
 | `bodyweight` | Kilograms, 30–300. Adds a `suggestedLoad` to each exercise |
 | `level` | `beginner` (default), `intermediate` or `advanced` |
+| `equipment` | Comma-separated kit, e.g. `dumbbell,bench`; empty means bodyweight only |
 
 Anything outside those ranges returns 400.
 

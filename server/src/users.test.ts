@@ -1,8 +1,9 @@
 process.env.DATA_FILE = new URL('../data/test-db.json', import.meta.url).pathname;
 
 import assert from 'node:assert/strict';
-import { readFile, rm } from 'node:fs/promises';
+import { readFile, rm, writeFile } from 'node:fs/promises';
 import { after, beforeEach, test } from 'node:test';
+import { GEAR } from './catalog.ts';
 import {
   createUser,
   findByEmail,
@@ -53,9 +54,37 @@ test('emails are matched case-insensitively', async () => {
   assert.equal(normaliseEmail(' A@B.co '), 'a@b.co');
 });
 
-test('a new account starts with an empty profile', async () => {
+test('a new account starts with an empty profile and a full gym', async () => {
   const user = await createUser('new@example.com', 'hunter2hunter2');
-  assert.deepEqual(user.profile, { heightCm: null, weightKg: null, level: 'beginner' });
+  assert.deepEqual(user.profile, { heightCm: null, weightKg: null, level: 'beginner', equipment: [...GEAR] });
+});
+
+test('equipment choices persist, ignoring unknown kit and duplicates', async () => {
+  const user = await createUser('home@example.com', 'hunter2hunter2');
+  await updateProfile(user.id, { equipment: ['dumbbell', 'dumbbell', 'rocket' as never, 'bench'] });
+
+  resetCache();
+  assert.deepEqual((await findByEmail('home@example.com'))?.profile.equipment, ['dumbbell', 'bench']);
+});
+
+test('accounts saved before equipment existed default to a full gym', async () => {
+  const legacy = {
+    users: [
+      {
+        id: 'old',
+        email: 'old@example.com',
+        passwordHash: await hashPassword('hunter2hunter2'),
+        profile: { heightCm: 180, weightKg: 80, level: 'beginner' },
+        createdAt: new Date().toISOString(),
+      },
+    ],
+    tokens: {},
+  };
+  await writeFile(DB, JSON.stringify(legacy));
+  resetCache();
+  const user = await findByEmail('old@example.com');
+  assert.deepEqual(user?.profile.equipment, [...GEAR]);
+  assert.equal(user?.profile.weightKg, 80);
 });
 
 test('the public view never carries the password hash', async () => {
@@ -83,7 +112,7 @@ test('profile updates persist across a reload from disk', async () => {
 
   resetCache(); // force a fresh read of the file
   const reloaded = await findByEmail('persist@example.com');
-  assert.deepEqual(reloaded?.profile, { heightCm: 178, weightKg: 82, level: 'intermediate' });
+  assert.deepEqual(reloaded?.profile, { heightCm: 178, weightKg: 82, level: 'intermediate', equipment: [...GEAR] });
 });
 
 test('writes to the file named by DATA_FILE, not the real database', async () => {

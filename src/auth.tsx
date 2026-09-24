@@ -4,6 +4,7 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 import { Platform } from 'react-native';
 import * as api from './api';
 import { AuthUser } from './api';
+import { DEFAULT_PROFILE } from './data';
 import { Profile } from './types';
 
 const TOKEN_KEY = 'gymtracker.token';
@@ -110,5 +111,5 @@ export function useAuth() {
 /** The signed-in profile, with sane defaults before one is filled in. */
 export function useProfile(): Profile {
   const { user } = useAuth();
-  return user?.profile ?? { heightCm: null, weightKg: null, level: 'beginner' };
+  return user?.profile ?? DEFAULT_PROFILE;
 }

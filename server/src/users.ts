@@ -2,6 +2,7 @@ import { randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
+import { GEAR, isGear, type Gear } from './catalog.ts';
 import { isLevel, type Level } from './load.ts';
 
 const scryptAsync = promisify(scrypt) as (secret: string, salt: Buffer, keylen: number) => Promise<Buffer>;
@@ -16,7 +17,15 @@ const dataFile = () => process.env.DATA_FILE ?? join(import.meta.dirname, '..', 
 export const TOKEN_TTL_DAYS = 30;
 export const MIN_PASSWORD_LENGTH = 8;
 
-export type Profile = { heightCm: number | null; weightKg: number | null; level: Level };
+export type Profile = {
+  heightCm: number | null;
+  weightKg: number | null;
+  level: Level;
+  /** Kit the lifter has access to. Everything by default, i.e. a full gym. */
+  equipment: Gear[];
+};
+
+export const DEFAULT_PROFILE = (): Profile => ({ heightCm: null, weightKg: null, level: 'beginner', equipment: [...GEAR] });
 
 export type User = {
   id: string;
@@ -44,7 +53,9 @@ async function load(): Promise<Db> {
   try {
     const raw = await readFile(dataFile(), 'utf8');
     const parsed = JSON.parse(raw) as Partial<Db>;
-    db = { users: parsed.users ?? [], tokens: parsed.tokens ?? {} };
+    // Accounts from before a profile field existed get its default.
+    const users = (parsed.users ?? []).map((u) => ({ ...u, profile: { ...DEFAULT_PROFILE(), ...u.profile } }));
+    db = { users, tokens: parsed.tokens ?? {} };
   } catch {
     db = structuredClone(EMPTY_DB); // first run, or an unreadable file
   }
@@ -100,7 +111,7 @@ export async function createUser(email: string, password: string): Promise<User>
     id: randomUUID(),
     email: normaliseEmail(email),
     passwordHash: await hashPassword(password),
-    profile: { heightCm: null, weightKg: null, level: 'beginner' },
+    profile: DEFAULT_PROFILE(),
     createdAt: new Date().toISOString(),
   };
   store.users.push(user);
@@ -116,6 +127,7 @@ export async function updateProfile(userId: string, patch: Partial<Profile>): Pr
   if ('heightCm' in patch) user.profile.heightCm = patch.heightCm ?? null;
   if ('weightKg' in patch) user.profile.weightKg = patch.weightKg ?? null;
   if (patch.level && isLevel(patch.level)) user.profile.level = patch.level;
+  if (Array.isArray(patch.equipment)) user.profile.equipment = [...new Set(patch.equipment.filter(isGear))];
 
   await persist();
   return user;

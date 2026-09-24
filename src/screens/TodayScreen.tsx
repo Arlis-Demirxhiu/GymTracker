@@ -5,7 +5,7 @@ import { useSuggestions } from '../api';
 import { useAuth } from '../auth';
 import { BodyPartSelector, BodyPartTag, Button, Card, SectionTitle } from '../components';
 import { HealthCard } from '../HealthCard';
-import { addDays, BODY_PARTS, daysBetween, formatDate, fromDateKey, isEmptyDay, toDateKey, WEEKDAY_NAMES } from '../data';
+import { addDays, BODY_PART_MAP, BODY_PARTS, daysBetween, formatDate, fromDateKey, isEmptyDay, toDateKey, WEEKDAY_NAMES } from '../data';
 import { useStore } from '../store';
 import { colors, radius } from '../theme';
 import { BodyPart, Weekday } from '../types';
@@ -38,7 +38,7 @@ export default function TodayScreen() {
 
   // Suggestions follow the saved log, so they appear once the workout is logged.
   const savedParts = existing?.bodyParts ?? [];
-  const suggestions = useSuggestions(savedParts, token, profile.level, profile.weightKg);
+  const suggestions = useSuggestions(savedParts, token, profile);
 
   const shiftDate = (n: number) => {
     const next = addDays(date, n);
@@ -155,15 +155,23 @@ export default function TodayScreen() {
                   </View>
                 </View>
               ))}
-              {suggestions.exercises.length > 0 &&
-                (profile.weightKg ? (
-                  <Text style={styles.loadNote}>
-                    Starting weights for a {profile.level} at {profile.weightKg} kg — warm up first and adjust to your
-                    own strength.
+              {suggestions.uncovered.length > 0 && (
+                <View style={styles.uncovered}>
+                  <Ionicons name="alert-circle-outline" size={18} color="#FFB84D" />
+                  <Text style={styles.uncoveredText}>
+                    Nothing in your equipment trains{' '}
+                    {suggestions.uncovered.map((p) => BODY_PART_MAP[p].label.toLowerCase()).join(' or ')}. Add
+                    dumbbells or a pull-up bar on the You tab to get exercises for{' '}
+                    {suggestions.uncovered.length === 1 ? 'it' : 'them'}.
                   </Text>
-                ) : (
-                  <Text style={styles.loadNote}>Add your weight on the You tab to get a starting kg for each lift.</Text>
-                ))}
+                </View>
+              )}
+              {suggestions.exercises.some((e) => e.suggestedLoad?.kg != null) && (
+                <Text style={styles.loadNote}>
+                  Starting weights for a {profile.level} at {profile.weightKg} kg — warm up first and adjust to your own
+                  strength.
+                </Text>
+              )}
             </>
           )}
         </Card>
@@ -230,10 +238,19 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   exName: { color: colors.text, fontSize: 15, flexShrink: 1 },
-  exSub: { color: colors.textFaint, fontSize: 12, marginTop: 2, textTransform: 'capitalize' },
+  exSub: { color: colors.textFaint, fontSize: 12, marginTop: 2 },
   exMeta: { color: colors.textDim, fontSize: 14, marginLeft: 12 },
   errText: { color: colors.textDim, fontSize: 14 },
   exLoad: { color: colors.accent, fontSize: 15, fontWeight: '700' },
+  uncovered: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: radius.md,
+    backgroundColor: '#FFB84D1A',
+  },
+  uncoveredText: { color: colors.textDim, fontSize: 13, lineHeight: 18, flex: 1 },
   loadNote: { color: colors.textFaint, fontSize: 11, lineHeight: 16, marginTop: 12 },
   restRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   restText: { color: colors.textDim, fontSize: 15, flexShrink: 1 },

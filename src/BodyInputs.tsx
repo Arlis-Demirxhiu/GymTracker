@@ -1,8 +1,11 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { ComponentProps, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { EQUIPMENT_PRESETS, GEAR_OPTIONS } from './data';
 import { colors, radius } from './theme';
-import { ExperienceLevel, Profile } from './types';
+import { ExperienceLevel, Gear, Profile } from './types';
+
+type MciName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
 /** Ranges the API accepts; anything outside is a typo, not a person. */
 export const RANGE = {
@@ -116,7 +119,94 @@ export function LevelPicker({
   );
 }
 
+/**
+ * What the lifter owns. Presets fill the toggles in one tap; the toggles then
+ * fine-tune, e.g. "dumbbells at home" plus a pull-up bar.
+ */
+export function EquipmentPicker({ value, onChange }: { value: Gear[]; onChange: (next: Gear[]) => void }) {
+  const has = (g: Gear) => value.includes(g);
+  const toggle = (g: Gear) => onChange(has(g) ? value.filter((x) => x !== g) : [...value, g]);
+  const sameSet = (a: Gear[], b: Gear[]) => a.length === b.length && a.every((g) => b.includes(g));
+
+  return (
+    <View>
+      <View style={styles.presetRow}>
+        {EQUIPMENT_PRESETS.map((p) => {
+          const on = sameSet(value, p.gear);
+          return (
+            <Pressable
+              key={p.key}
+              onPress={() => onChange(p.gear)}
+              style={[styles.preset, on && styles.presetOn]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+            >
+              <MaterialCommunityIcons
+                name={p.icon as MciName}
+                size={20}
+                color={on ? colors.accentText : colors.textDim}
+              />
+              <Text style={[styles.presetText, on && { color: colors.accentText }]}>{p.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={styles.gearGrid}>
+        {GEAR_OPTIONS.map((g) => {
+          const on = has(g.key);
+          return (
+            <Pressable
+              key={g.key}
+              onPress={() => toggle(g.key)}
+              style={[styles.gear, on && styles.gearOn]}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: on }}
+            >
+              <MaterialCommunityIcons name={g.icon as MciName} size={16} color={on ? colors.accent : colors.textFaint} />
+              <Text style={[styles.gearText, on && { color: colors.text }]}>{g.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={styles.gearNote}>
+        {value.length === 0
+          ? 'Bodyweight only — biceps and forearms need at least dumbbells or a pull-up bar.'
+          : 'Exercises that need anything you haven\'t ticked are left out.'}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  presetRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  preset: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: radius.md,
+    backgroundColor: colors.cardAlt,
+  },
+  presetOn: { backgroundColor: colors.accent },
+  presetText: { color: colors.textDim, fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  gearGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  gear: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.cardAlt,
+  },
+  gearOn: { borderColor: colors.accent, backgroundColor: colors.accent + '1F' },
+  gearText: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
+  gearNote: { color: colors.textFaint, fontSize: 12, lineHeight: 17, marginTop: 12 },
   field: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   label: { color: colors.text, fontSize: 16 },
   inputWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },

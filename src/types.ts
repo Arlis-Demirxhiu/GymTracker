@@ -41,9 +41,25 @@ export type WorkoutLog = {
 
 export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
 
+/** Kit the lifter can use; mirrors GEAR in server/src/catalog.ts. */
+export type Gear =
+  | 'barbell'
+  | 'dumbbell'
+  | 'kettlebell'
+  | 'bench'
+  | 'machine'
+  | 'cable'
+  | 'pullup-bar'
+  | 'dip-bars'
+  | 'cardio-machine'
+  | 'jump-rope'
+  | 'ab-wheel';
+
 export type Profile = {
   /** Centimetres. Used for BMI only — it does not change suggested weights. */
   heightCm: number | null;
   weightKg: number | null;
   level: ExperienceLevel;
+  /** What the lifter has access to; exercises needing anything else are skipped. */
+  equipment: Gear[];
 };

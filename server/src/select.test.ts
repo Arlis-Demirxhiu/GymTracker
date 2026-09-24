@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { MAX_EXERCISES, selectExercises } from './select.ts';
+import { BODY_PARTS } from './catalog.ts';
+import { MAX_EXERCISES, selectExercises, uncoveredParts } from './select.ts';
 
 test('never returns more than six exercises', () => {
   const all = selectExercises(['chest', 'back', 'shoulders', 'biceps', 'triceps', 'abs', 'quads']);
@@ -50,4 +51,46 @@ test('runs out gracefully when the catalog is smaller than the limit', () => {
   const picked = selectExercises(['cardio'], 6);
   assert.ok(picked.length <= 6);
   assert.ok(picked.every((e) => e.bodyPart === 'cardio'));
+});
+
+// ---- equipment ----
+
+test('only suggests exercises the lifter has the kit for', () => {
+  const picked = selectExercises(['chest', 'back', 'quads', 'shoulders'], 6, ['dumbbell']);
+  assert.ok(picked.length > 0);
+  for (const exercise of picked) {
+    assert.ok(
+      exercise.requires.every((g) => g === 'dumbbell'),
+      `${exercise.id} needs ${exercise.requires.join(', ')}`,
+    );
+  }
+});
+
+test('a bench unlocks bench exercises, which a dumbbell-only home misses', () => {
+  const without = selectExercises(['chest'], 6, ['dumbbell']).map((e) => e.id);
+  const withBench = selectExercises(['chest'], 6, ['dumbbell', 'bench']).map((e) => e.id);
+  assert.ok(!without.includes('incline-db-press'));
+  assert.ok(withBench.includes('incline-db-press'));
+});
+
+test('bodyweight only still trains everything except biceps and forearms', () => {
+  const everything = [...BODY_PARTS];
+  assert.deepEqual(uncoveredParts(everything, []), ['biceps', 'forearms']);
+  for (const exercise of selectExercises(['chest', 'quads', 'abs'], 6, [])) {
+    assert.deepEqual(exercise.requires, []);
+  }
+});
+
+test('a set of dumbbells is enough to cover every muscle', () => {
+  assert.deepEqual(uncoveredParts([...BODY_PARTS], ['dumbbell']), []);
+});
+
+test('does not pad a short session with exercises you cannot do', () => {
+  const picked = selectExercises(['biceps'], 6, []);
+  assert.equal(picked.length, 0);
+});
+
+test('with no equipment filter the full gym is used, classic lifts first', () => {
+  assert.equal(selectExercises(['chest'])[0].id, 'bench-press');
+  assert.deepEqual(uncoveredParts([...BODY_PARTS]), []);
 });

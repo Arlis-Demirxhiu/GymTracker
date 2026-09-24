@@ -2,17 +2,16 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 import { describe } from '../api';
 import { useAuth } from '../auth';
-import { BodyInputs, LevelPicker } from '../BodyInputs';
+import { BodyInputs, EquipmentPicker, LevelPicker } from '../BodyInputs';
 import { Button, Card, SectionTitle } from '../components';
+import { DEFAULT_PROFILE } from '../data';
 import { colors } from '../theme';
 import { ExperienceLevel, Profile } from '../types';
 
 /** Shown once, right after the first sign-in: weights need a bodyweight. */
 export default function OnboardingScreen() {
   const { user, updateProfile, signOut } = useAuth();
-  const [draft, setDraft] = useState<Profile>(
-    user?.profile ?? { heightCm: null, weightKg: null, level: 'beginner' },
-  );
+  const [draft, setDraft] = useState<Profile>(user?.profile ?? DEFAULT_PROFILE);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,6 +52,14 @@ export default function OnboardingScreen() {
           <LevelPicker
             value={draft.level}
             onChange={(level: ExperienceLevel) => setDraft((prev) => ({ ...prev, level }))}
+          />
+        </Card>
+
+        <Card>
+          <SectionTitle>Where do you train?</SectionTitle>
+          <EquipmentPicker
+            value={draft.equipment}
+            onChange={(equipment) => setDraft((prev) => ({ ...prev, equipment }))}
           />
         </Card>
 

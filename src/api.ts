@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BodyPart, Exercise, ExperienceLevel, Profile } from './types';
+import { BodyPart, Exercise, Profile } from './types';
 
 const API_PORT = 3001;
 
@@ -90,12 +90,18 @@ export const patchProfile = (token: string, patch: Partial<Profile>) =>
 
 // ---- exercises ----
 
-export async function fetchSuggestions(parts: BodyPart[], token?: string | null): Promise<Suggestion[]> {
-  if (parts.length === 0) return [];
-  // The server reads bodyweight and level from the signed-in account.
+export type Suggestions = {
+  exercises: Suggestion[];
+  /** Requested muscles that nothing in the account's equipment can train. */
+  uncovered: BodyPart[];
+};
+
+export async function fetchSuggestions(parts: BodyPart[], token?: string | null): Promise<Suggestions> {
+  if (parts.length === 0) return { exercises: [], uncovered: [] };
+  // The server reads bodyweight, level and equipment from the signed-in account.
   const query = new URLSearchParams({ parts: parts.join(',') });
-  const body = await request<{ exercises: Suggestion[] }>(`/exercises?${query.toString()}`, { token });
-  return body.exercises;
+  const body = await request<Suggestions>(`/exercises?${query.toString()}`, { token });
+  return { exercises: body.exercises, uncovered: body.uncovered ?? [] };
 }
 
 /** A message worth showing: the server's complaint beats a generic network error. */
@@ -108,11 +114,16 @@ export function describe(err: unknown): string {
 }
 
 /** Fetches suggestions for `parts`, re-running when the selection or profile changes. */
-export function useSuggestions(parts: BodyPart[], token: string | null, level?: ExperienceLevel, weightKg?: number | null) {
+export function useSuggestions(parts: BodyPart[], token: string | null, profile?: Profile) {
   const [exercises, setExercises] = useState<Suggestion[]>([]);
+  const [uncovered, setUncovered] = useState<BodyPart[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const key = [...parts].sort().join(',');
+  // The server reads the profile itself, but a change to it must still refetch.
+  const profileKey = profile
+    ? `${profile.level}|${profile.weightKg}|${[...profile.equipment].sort().join(',')}`
+    : '';
   // Only the latest request may write to state.
   const requestId = useRef(0);
 
@@ -122,6 +133,7 @@ export function useSuggestions(parts: BodyPart[], token: string | null, level?: 
 
     if (wanted.length === 0) {
       setExercises([]);
+      setUncovered([]);
       setError(null);
       setLoading(false);
       return;
@@ -129,23 +141,25 @@ export function useSuggestions(parts: BodyPart[], token: string | null, level?: 
 
     setLoading(true);
     fetchSuggestions(wanted, token)
-      .then((list) => {
+      .then((result) => {
         if (id !== requestId.current) return;
-        setExercises(list);
+        setExercises(result.exercises);
+        setUncovered(result.uncovered);
         setError(null);
       })
       .catch((err: unknown) => {
         if (id !== requestId.current) return;
         setExercises([]);
+        setUncovered([]);
         setError(describe(err));
       })
       .finally(() => {
         if (id === requestId.current) setLoading(false);
       });
-    // level and weightKg are not sent, but a change to either must refetch.
-  }, [key, token, level, weightKg]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- profileKey stands in for the profile
+  }, [key, token, profileKey]);
 
   useEffect(load, [load]);
 
-  return { exercises, loading, error, reload: load };
+  return { exercises, uncovered, loading, error, reload: load };
 }
