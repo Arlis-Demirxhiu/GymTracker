@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { describe } from '../api';
 import { useAuth } from '../auth';
 import { Button, Card } from '../components';
+import { KeyboardAwareScrollView } from '../KeyboardAwareScrollView';
 import { colors, radius } from '../theme';
 
 const MIN_PASSWORD = 8;
@@ -33,8 +34,7 @@ export default function AuthScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+    <KeyboardAwareScrollView contentContainerStyle={styles.container} bottomOffset={120}>
         <View style={styles.hero}>
           <Ionicons name="barbell" size={40} color={colors.accent} />
           <Text style={styles.title}>GymTracker</Text>
@@ -99,8 +99,7 @@ export default function AuthScreen() {
           Your account lives on your own GymTracker server. Over plain HTTP on a home network, keep it to a password you
           don't use anywhere else.
         </Text>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScrollView>
   );
 }
 

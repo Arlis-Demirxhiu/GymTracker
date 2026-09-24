@@ -2,9 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import {
   Alert,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +16,7 @@ import { fetchSuggestions } from '../api';
 import { useAuth } from '../auth';
 import { BodyPartSelector, BodyPartTag, Button, Card } from '../components';
 import { dayTitle, newId, partsTitle, WEEK_ORDER, WEEKDAY_NAMES } from '../data';
+import { KeyboardAwareScrollView } from '../KeyboardAwareScrollView';
 import { useStore } from '../store';
 import { colors, radius } from '../theme';
 import { BodyPart, DayPlan, Weekday } from '../types';
@@ -173,8 +172,7 @@ function DayEditor({
           </Pressable>
         </View>
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+        <KeyboardAwareScrollView contentContainerStyle={styles.modalBody} bottomOffset={130}>
             <Text style={styles.label}>Workout name</Text>
             <TextInput
               value={plan.title}
@@ -269,8 +267,7 @@ function DayEditor({
                 </View>
               </>
             )}
-          </ScrollView>
-        </KeyboardAvoidingView>
+        </KeyboardAwareScrollView>
       </SafeAreaView>
     </Modal>
   );

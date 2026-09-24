@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import { describe } from '../api';
 import { useAuth } from '../auth';
 import { BodyInputs, EquipmentPicker, LevelPicker } from '../BodyInputs';
 import { Button, Card, SectionTitle } from '../components';
 import { DEFAULT_PROFILE } from '../data';
+import { KeyboardAwareScrollView } from '../KeyboardAwareScrollView';
 import { colors } from '../theme';
 import { ExperienceLevel, Profile } from '../types';
 
@@ -29,8 +30,7 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+    <KeyboardAwareScrollView contentContainerStyle={styles.container}>
         <Text style={styles.h1}>A couple of numbers</Text>
         <Text style={styles.sub}>
           Your weight sets the starting kg for every exercise the app suggests. You can change these any time.
@@ -74,8 +74,7 @@ export default function OnboardingScreen() {
         {!draft.weightKg && <Text style={styles.hint}>Enter your weight to continue.</Text>}
 
         <Button label="Sign out" variant="ghost" onPress={signOut} style={{ marginTop: 12 }} />
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScrollView>
   );
 }
 

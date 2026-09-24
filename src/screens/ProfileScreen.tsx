@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { describe } from '../api';
 import { useAuth } from '../auth';
 import { BodyInputs, EquipmentPicker, LevelPicker } from '../BodyInputs';
 import { Button, Card, SectionTitle } from '../components';
 import { getHealthSummary, isHealthAvailable, requestHealthAccess } from '../health';
 import { DEFAULT_PROFILE } from '../data';
+import { KeyboardAwareScrollView } from '../KeyboardAwareScrollView';
 import { colors } from '../theme';
 import { Profile } from '../types';
 
@@ -52,7 +53,7 @@ export default function ProfileScreen() {
   const bmi = profile.heightCm && profile.weightKg ? profile.weightKg / (profile.heightCm / 100) ** 2 : null;
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+    <KeyboardAwareScrollView contentContainerStyle={styles.container}>
       <Text style={styles.h1}>You</Text>
       <Text style={styles.sub}>{user?.email ?? 'Signed in'}</Text>
 
@@ -105,7 +106,7 @@ export default function ProfileScreen() {
       </Card>
 
       <Button label="Sign out" variant="ghost" onPress={confirmSignOut} />
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 

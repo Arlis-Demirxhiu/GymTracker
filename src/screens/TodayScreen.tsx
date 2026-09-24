@@ -5,7 +5,6 @@ import {
   Alert,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -29,6 +28,7 @@ import {
   toDateKey,
   WEEKDAY_NAMES,
 } from '../data';
+import { KeyboardAwareScrollView } from '../KeyboardAwareScrollView';
 import { useStore } from '../store';
 import { colors, radius } from '../theme';
 import { BodyPart, Exercise, Weekday } from '../types';
@@ -127,7 +127,7 @@ export default function TodayScreen() {
   }, [logs]);
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+    <KeyboardAwareScrollView contentContainerStyle={styles.container}>
       <Text style={styles.h1}>{isToday ? 'Today' : WEEKDAY_NAMES[date.getDay()]}</Text>
 
       <View style={styles.dateRow}>
@@ -290,7 +290,7 @@ export default function TodayScreen() {
           </View>
         ))}
       </Card>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 
