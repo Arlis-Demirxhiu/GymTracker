@@ -52,7 +52,7 @@ export const ALL_GEAR: Gear[] = GEAR_OPTIONS.map((g) => g.key);
 /** Starting points; the toggles fine-tune from there. */
 export const EQUIPMENT_PRESETS: { key: string; label: string; icon: string; gear: Gear[] }[] = [
   { key: 'gym', label: 'Full gym', icon: 'office-building', gear: ALL_GEAR },
-  { key: 'home', label: 'Dumbbells at home', icon: 'home-variant', gear: ['dumbbell'] },
+  { key: 'home', label: 'Home', icon: 'home-variant', gear: ['dumbbell'] },
   { key: 'none', label: 'No equipment', icon: 'human-handsup', gear: [] },
 ];
 
