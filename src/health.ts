@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Platform } from 'react-native';
+import { Platform, TurboModuleRegistry } from 'react-native';
 
 /**
  * Apple Health.
@@ -17,12 +17,20 @@ let cached: HealthKitModule | null | undefined;
 function healthkit(): HealthKitModule | null {
   if (cached !== undefined) return cached;
   if (Platform.OS !== 'ios') return (cached = null);
+
+  // Check for the native side before touching the package. A try/catch
+  // around require() is not enough: when a module throws while loading,
+  // Metro reports it as a fatal error itself and hands back undefined, so the
+  // catch never runs. TurboModuleRegistry.get returns null instead of
+  // throwing, which is what Expo Go (no HealthKit built in) gives us.
+  if (TurboModuleRegistry.get('NitroModules') == null) return (cached = null);
+
   try {
     cached = require('@kingstinct/react-native-healthkit') as HealthKitModule;
   } catch {
-    cached = null; // Expo Go: the native side was never built in
+    cached = null;
   }
-  return cached;
+  return cached ?? null;
 }
 
 /** Everything we ask permission to read. */
