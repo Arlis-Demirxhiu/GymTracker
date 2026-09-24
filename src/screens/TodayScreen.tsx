@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { useSuggestions } from '../api';
 import { useAuth } from '../auth';
 import { BodyPartSelector, BodyPartTag, Button, Card, SectionTitle } from '../components';
+import { HealthCard } from '../HealthCard';
 import { addDays, BODY_PARTS, daysBetween, formatDate, fromDateKey, isEmptyDay, toDateKey, WEEKDAY_NAMES } from '../data';
 import { useStore } from '../store';
 import { colors, radius } from '../theme';
@@ -73,6 +74,8 @@ export default function TodayScreen() {
           <Ionicons name="chevron-forward" size={20} color={colors.text} />
         </Pressable>
       </View>
+
+      <HealthCard day={date} />
 
       {!isEmptyDay(plan) && (
         <Card>

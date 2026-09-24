@@ -4,6 +4,7 @@ import { describe } from '../api';
 import { useAuth } from '../auth';
 import { BodyInputs, LevelPicker } from '../BodyInputs';
 import { Button, Card, SectionTitle } from '../components';
+import { getHealthSummary, isHealthAvailable, requestHealthAccess } from '../health';
 import { colors } from '../theme';
 import { Profile } from '../types';
 
@@ -15,6 +16,30 @@ export default function ProfileScreen() {
   const save = (patch: Partial<Profile>) => {
     setError(null);
     updateProfile(patch).catch((err) => setError(describe(err)));
+  };
+
+  const [importing, setImporting] = useState(false);
+
+  /** Copies the latest height and weight Apple Health has on file. */
+  const importFromHealth = async () => {
+    setImporting(true);
+    setError(null);
+    try {
+      await requestHealthAccess();
+      const health = await getHealthSummary();
+      if (health.weightKg === null && health.heightCm === null) {
+        setError("Apple Health doesn't have a height or weight for you yet.");
+        return;
+      }
+      await updateProfile({
+        ...(health.weightKg !== null && { weightKg: Math.round(health.weightKg * 10) / 10 }),
+        ...(health.heightCm !== null && { heightCm: Math.round(health.heightCm) }),
+      });
+    } catch (err) {
+      setError(describe(err));
+    } finally {
+      setImporting(false);
+    }
   };
 
   const confirmSignOut = () =>
@@ -32,7 +57,16 @@ export default function ProfileScreen() {
 
       <Card>
         <SectionTitle>Body</SectionTitle>
-        <BodyInputs initial={profile} onCommit={save} />
+        <BodyInputs key={`${profile.heightCm}-${profile.weightKg}`} initial={profile} onCommit={save} />
+        {isHealthAvailable() && (
+          <Button
+            label={importing ? 'Reading Apple Health…' : 'Fill in from Apple Health'}
+            variant="ghost"
+            onPress={importFromHealth}
+            disabled={importing}
+            style={{ marginTop: 4, marginBottom: 8 }}
+          />
+        )}
 
         {bmi !== null && (
           <View style={styles.bmiRow}>

@@ -10,18 +10,26 @@ A React Native (Expo) app for tracking which body parts you train and planning a
 - **Body map**: pick muscles by tapping a front/back figure instead of a list (the list is still one tap away, and cardio stays a chip).
 - **Suggested exercises**: the muscles you select are sent to the [exercise API](#api), which answers with up to six exercises — shown on Today, and addable to any agenda day with one button.
 - **You**: your height, weight and experience level. The weight and level turn each suggested exercise into a starting kg (`2 × 16 kg` for dumbbells, `Bodyweight` where nothing is loaded); height is only used for BMI.
+- **Apple Health**: today's active and total calories, steps, exercise minutes and resting heart rate on the Today screen, and a one-tap import of your height and weight on the You tab. Read-only — nothing is written back to Health.
 - **History**: a weekly strip with day-by-day dots, sessions per body part over 7, 30, or 90 days, and a list of every workout (each one can be deleted).
 
 Your profile lives on the server with your account; agenda and workout logs are stored on the device with AsyncStorage, under a key per account.
 
 ## Run
 
+The app uses Apple HealthKit, which is native code that **Expo Go cannot load**, so on iOS you run a development build — your own copy of the app, built once with Xcode — instead of Expo Go. Needs Xcode and CocoaPods (`brew install cocoapods`).
+
 ```bash
 npm install
-npx expo start
+npx expo run:ios                     # simulator
+npx expo run:ios --device            # your iPhone, plugged in
 ```
 
-Scan the QR code with **Expo Go** on your phone, or press `i` for the iOS simulator (needs Xcode), `a` for the Android emulator, or `w` for the web.
+After the first build, day-to-day work is the same as before: `npx expo start`, and the installed app picks up your changes. Rebuild only when you add a native package or change `app.json`.
+
+On a physical iPhone with a free Apple ID, the build expires after 7 days — run `npx expo run:ios --device` again. Distributing an app that uses HealthKit needs the paid Apple Developer Program.
+
+Expo Go and the web build still run everything except Apple Health, which simply doesn't appear there. `npx expo start` now targets the development build by default; press `s` in its terminal to switch back to Expo Go.
 
 Start the API in a second terminal — the app cannot sign in without it:
 
