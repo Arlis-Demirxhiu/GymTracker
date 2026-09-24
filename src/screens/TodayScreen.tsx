@@ -20,6 +20,7 @@ import {
   addDays,
   BODY_PART_MAP,
   BODY_PARTS,
+  dayTitle,
   daysBetween,
   formatDate,
   fromDateKey,
@@ -33,14 +34,6 @@ import { colors, radius } from '../theme';
 import { BodyPart, Exercise, Weekday } from '../types';
 
 const sameParts = (a: BodyPart[], b: BodyPart[]) => [...a].sort().join() === [...b].sort().join();
-
-/** "Chest & Biceps", or "Chest, Back & 2 more" for longer lists. */
-const planTitle = (parts: BodyPart[]) => {
-  const labels = parts.map((p) => BODY_PART_MAP[p].label);
-  if (labels.length === 1) return labels[0];
-  if (labels.length <= 3) return `${labels.slice(0, -1).join(', ')} & ${labels[labels.length - 1]}`;
-  return `${labels.slice(0, 2).join(', ')} & ${labels.length - 2} more`;
-};
 
 /** Yes/no question that also works in the browser, where Alert ignores buttons. */
 const confirm = (title: string, message: string) =>
@@ -106,7 +99,7 @@ export default function TodayScreen() {
     if (!isEmptyDay(current)) {
       const replace = await confirm(
         `Replace ${dayName}'s plan?`,
-        `${dayName} is planned as "${current.rest ? 'Rest' : current.title || 'a workout'}". Put this workout there instead?`,
+        `${dayName} is planned as "${dayTitle(current)}". Put this workout there instead?`,
       );
       if (!replace) return;
     }
@@ -118,7 +111,7 @@ export default function TodayScreen() {
     } catch {
       // Offline: still plan the muscles; the exercises can be filled in later.
     }
-    updateDay(weekday, { title: planTitle(selected), rest: false, bodyParts: selected, exercises });
+    updateDay(weekday, { title: '', rest: false, bodyParts: selected, exercises });
   };
 
   // Before anything is logged the screen simply asks what you feel like training.
@@ -162,7 +155,7 @@ export default function TodayScreen() {
             </View>
           ) : (
             <>
-              <Text style={styles.planTitle}>{plan.title || 'Workout'}</Text>
+              <Text style={styles.planTitle}>{dayTitle(plan)}</Text>
               <View style={styles.tagRow}>
                 {plan.bodyParts.map((p) => (
                   <BodyPartTag key={p} part={p} />

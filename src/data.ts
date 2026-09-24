@@ -78,6 +78,25 @@ export const DEFAULT_AGENDA: Agenda = {
   6: emptyDay(),
 };
 
+/** "Chest & Biceps", "Chest, Back & Biceps", or "Chest, Back & 2 more". */
+export const partsTitle = (parts: BodyPart[]) => {
+  const labels = parts.map((p) => BODY_PART_MAP[p].label);
+  if (labels.length <= 1) return labels[0] ?? '';
+  if (labels.length <= 3) return `${labels.slice(0, -1).join(', ')} & ${labels[labels.length - 1]}`;
+  return `${labels.slice(0, 2).join(', ')} & ${labels.length - 2} more`;
+};
+
+/**
+ * What to call a day. An unnamed plan is named after its muscles, worked out
+ * when shown rather than saved, so it stays right if the muscles change.
+ */
+export const dayTitle = (plan: DayPlan) => {
+  if (plan.title.trim()) return plan.title.trim();
+  if (plan.rest) return 'Rest';
+  if (plan.bodyParts.length > 0) return partsTitle(plan.bodyParts);
+  return plan.exercises.length > 0 ? 'Workout' : 'Nothing planned';
+};
+
 /** True when a day has nothing planned at all. */
 export const isEmptyDay = (plan: DayPlan) =>
   !plan.rest && !plan.title.trim() && plan.bodyParts.length === 0 && plan.exercises.length === 0;

@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetchSuggestions } from '../api';
 import { useAuth } from '../auth';
 import { BodyPartSelector, BodyPartTag, Button, Card } from '../components';
-import { newId, WEEK_ORDER, WEEKDAY_NAMES } from '../data';
+import { dayTitle, newId, partsTitle, WEEK_ORDER, WEEKDAY_NAMES } from '../data';
 import { useStore } from '../store';
 import { colors, radius } from '../theme';
 import { BodyPart, DayPlan, Weekday } from '../types';
@@ -59,7 +59,7 @@ export default function AgendaScreen() {
                   <Ionicons name="create-outline" size={18} color={colors.textFaint} />
                 </View>
                 <Text style={[styles.dayTitle, plan.rest && { color: colors.textDim }]}>
-                  {plan.rest ? `😴 ${plan.title || 'Rest'}` : plan.title || 'Nothing planned'}
+                  {plan.rest ? `😴 ${dayTitle(plan)}` : dayTitle(plan)}
                 </Text>
                 {!plan.rest && plan.bodyParts.length > 0 && (
                   <View style={styles.tagRow}>
@@ -179,7 +179,7 @@ function DayEditor({
             <TextInput
               value={plan.title}
               onChangeText={(title) => setPlan((p) => ({ ...p, title }))}
-              placeholder={plan.rest ? 'Rest' : 'e.g. Push, Leg Day, Upper'}
+              placeholder={plan.rest ? 'Rest' : plan.bodyParts.length > 0 ? partsTitle(plan.bodyParts) : 'e.g. Push, Leg Day, Upper'}
               placeholderTextColor={colors.textFaint}
               style={styles.input}
             />
