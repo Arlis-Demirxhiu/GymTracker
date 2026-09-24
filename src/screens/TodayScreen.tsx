@@ -1,17 +1,59 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useSuggestions } from '../api';
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { fetchSuggestions, useSuggestions } from '../api';
 import { useAuth } from '../auth';
 import { BodyPartSelector, BodyPartTag, Button, Card, SectionTitle } from '../components';
 import { HealthCard } from '../HealthCard';
-import { addDays, BODY_PART_MAP, BODY_PARTS, daysBetween, formatDate, fromDateKey, isEmptyDay, toDateKey, WEEKDAY_NAMES } from '../data';
+import {
+  addDays,
+  BODY_PART_MAP,
+  BODY_PARTS,
+  daysBetween,
+  formatDate,
+  fromDateKey,
+  isEmptyDay,
+  newId,
+  toDateKey,
+  WEEKDAY_NAMES,
+} from '../data';
 import { useStore } from '../store';
 import { colors, radius } from '../theme';
-import { BodyPart, Weekday } from '../types';
+import { BodyPart, Exercise, Weekday } from '../types';
+
+const sameParts = (a: BodyPart[], b: BodyPart[]) => [...a].sort().join() === [...b].sort().join();
+
+/** "Chest & Biceps", or "Chest, Back & 2 more" for longer lists. */
+const planTitle = (parts: BodyPart[]) => {
+  const labels = parts.map((p) => BODY_PART_MAP[p].label);
+  if (labels.length === 1) return labels[0];
+  if (labels.length <= 3) return `${labels.slice(0, -1).join(', ')} & ${labels[labels.length - 1]}`;
+  return `${labels.slice(0, 2).join(', ')} & ${labels.length - 2} more`;
+};
+
+/** Yes/no question that also works in the browser, where Alert ignores buttons. */
+const confirm = (title: string, message: string) =>
+  new Promise<boolean>((resolve) => {
+    if (Platform.OS === 'web') return resolve(window.confirm(`${title}\n\n${message}`));
+    Alert.alert(title, message, [
+      { text: 'Keep it', style: 'cancel', onPress: () => resolve(false) },
+      { text: 'Replace', style: 'destructive', onPress: () => resolve(true) },
+    ]);
+  });
 
 export default function TodayScreen() {
-  const { agenda, logs, saveLog, logForDate } = useStore();
+  const { agenda, logs, saveLog, logForDate, settings, updateSettings, updateDay } = useStore();
   const { token, user } = useAuth();
   const profile = user!.profile;
   const todayKey = toDateKey(new Date());
@@ -46,6 +88,39 @@ export default function TodayScreen() {
     setDateKey(toDateKey(next));
   };
 
+  const weekday = date.getDay() as Weekday;
+  const dayName = WEEKDAY_NAMES[weekday];
+
+  /**
+   * Saves the log and, when the option is on, makes the workout that weekday's
+   * agenda plan too — with the suggested exercises. A plan the user built
+   * themselves is only replaced after asking.
+   */
+  const save = async () => {
+    saveLog(dateKey, selected, note);
+    if (!settings.syncAgenda || selected.length === 0) return;
+
+    const current = agenda[weekday];
+    if (!current.rest && sameParts(current.bodyParts, selected)) return; // already the plan
+
+    if (!isEmptyDay(current)) {
+      const replace = await confirm(
+        `Replace ${dayName}'s plan?`,
+        `${dayName} is planned as "${current.rest ? 'Rest' : current.title || 'a workout'}". Put this workout there instead?`,
+      );
+      if (!replace) return;
+    }
+
+    let exercises: Exercise[] = [];
+    try {
+      const { exercises: suggested } = await fetchSuggestions(selected, token);
+      exercises = suggested.map((x) => ({ id: newId(), name: x.name, sets: x.sets, reps: x.reps }));
+    } catch {
+      // Offline: still plan the muscles; the exercises can be filled in later.
+    }
+    updateDay(weekday, { title: planTitle(selected), rest: false, bodyParts: selected, exercises });
+  };
+
   // Before anything is logged the screen simply asks what you feel like training.
   const askWhatToTrain = savedParts.length === 0;
 
@@ -77,7 +152,7 @@ export default function TodayScreen() {
 
       <HealthCard day={date} />
 
-      {!isEmptyDay(plan) && (
+      {!isEmptyDay(plan) && !(savedParts.length > 0 && !plan.rest && sameParts(plan.bodyParts, savedParts)) && (
         <Card>
           <SectionTitle>Planned</SectionTitle>
           {plan.rest ? (
@@ -181,7 +256,7 @@ export default function TodayScreen() {
         <SectionTitle
           right={existing && !dirty ? <Text style={styles.saved}>✓ Saved</Text> : undefined}
         >
-          {askWhatToTrain ? 'What do you want to train today?' : 'What did you train?'}
+          {askWhatToTrain ? 'What do you want to train today?' : 'What will you train?'}
         </SectionTitle>
         <BodyPartSelector selected={selected} onToggle={toggle} planned={plan.rest ? [] : plan.bodyParts} />
         <TextInput
@@ -192,9 +267,21 @@ export default function TodayScreen() {
           style={styles.input}
           multiline
         />
+        <View style={styles.syncRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.syncLabel}>Save to {dayName}'s agenda</Text>
+            <Text style={styles.syncHint}>{dayName} will show this workout and its exercises.</Text>
+          </View>
+          <Switch
+            value={settings.syncAgenda}
+            onValueChange={(syncAgenda) => updateSettings({ syncAgenda })}
+            trackColor={{ true: colors.accent, false: colors.border }}
+            accessibilityLabel={`Save to ${dayName}'s agenda`}
+          />
+        </View>
         <Button
           label={existing ? (selected.length || note.trim() ? 'Update log' : 'Clear log') : 'Save workout'}
-          onPress={() => saveLog(dateKey, selected, note)}
+          onPress={save}
           disabled={!dirty}
           style={{ marginTop: 12 }}
         />
@@ -242,6 +329,9 @@ const styles = StyleSheet.create({
   exMeta: { color: colors.textDim, fontSize: 14, marginLeft: 12 },
   errText: { color: colors.textDim, fontSize: 14 },
   exLoad: { color: colors.accent, fontSize: 15, fontWeight: '700' },
+  syncRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 14 },
+  syncLabel: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  syncHint: { color: colors.textFaint, fontSize: 12, marginTop: 2 },
   uncovered: {
     flexDirection: 'row',
     gap: 8,

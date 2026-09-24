@@ -10,11 +10,21 @@ import { Agenda, BodyPart, DayPlan, Weekday, WorkoutLog } from './types';
  */
 const agendaKey = (userId: string) => `gymtracker:agenda:v2:${userId}`;
 const logsKey = (userId: string) => `gymtracker:logs:v2:${userId}`;
+const settingsKey = (userId: string) => `gymtracker:settings:v1:${userId}`;
+
+type Settings = {
+  /** Saving a workout on Today also makes it that weekday's agenda plan. */
+  syncAgenda: boolean;
+};
+
+const DEFAULT_SETTINGS: Settings = { syncAgenda: true };
 
 type Store = {
   ready: boolean;
   agenda: Agenda;
   logs: WorkoutLog[];
+  settings: Settings;
+  updateSettings: (patch: Partial<Settings>) => void;
   updateDay: (day: Weekday, plan: DayPlan) => void;
   resetAgenda: () => void;
   /** Creates or replaces the log for a date. Empty body parts + empty note deletes it. */
@@ -31,6 +41,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [agenda, setAgenda] = useState<Agenda>(DEFAULT_AGENDA);
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
 
   // Swap to the signed-in account's data (and away from it on sign-out).
   useEffect(() => {
@@ -38,6 +49,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setReady(false);
     setAgenda(DEFAULT_AGENDA);
     setLogs([]);
+    setSettings(DEFAULT_SETTINGS);
 
     if (!userId) {
       setReady(true);
@@ -46,13 +58,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     (async () => {
       try {
-        const [a, l] = await Promise.all([
+        const [a, l, st] = await Promise.all([
           AsyncStorage.getItem(agendaKey(userId)),
           AsyncStorage.getItem(logsKey(userId)),
+          AsyncStorage.getItem(settingsKey(userId)),
         ]);
         if (cancelled) return;
         if (a) setAgenda(JSON.parse(a));
         if (l) setLogs(JSON.parse(l));
+        if (st) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(st) });
       } catch (e) {
         console.warn('Failed to load saved data', e);
       } finally {
@@ -72,6 +86,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (ready && userId) AsyncStorage.setItem(logsKey(userId), JSON.stringify(logs)).catch(console.warn);
   }, [logs, ready, userId]);
+
+  useEffect(() => {
+    if (ready && userId) AsyncStorage.setItem(settingsKey(userId), JSON.stringify(settings)).catch(console.warn);
+  }, [settings, ready, userId]);
+
+  const updateSettings = useCallback((patch: Partial<Settings>) => {
+    setSettings((prev) => ({ ...prev, ...patch }));
+  }, []);
 
   const updateDay = useCallback((day: Weekday, plan: DayPlan) => {
     setAgenda((prev) => ({ ...prev, [day]: plan }));
@@ -96,8 +118,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const logForDate = useCallback((date: string) => logs.find((l) => l.date === date), [logs]);
 
   const value = useMemo(
-    () => ({ ready, agenda, logs, updateDay, resetAgenda, saveLog, deleteLog, logForDate }),
-    [ready, agenda, logs, updateDay, resetAgenda, saveLog, deleteLog, logForDate],
+    () => ({ ready, agenda, logs, settings, updateSettings, updateDay, resetAgenda, saveLog, deleteLog, logForDate }),
+    [ready, agenda, logs, settings, updateSettings, updateDay, resetAgenda, saveLog, deleteLog, logForDate],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
