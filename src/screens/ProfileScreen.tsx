@@ -52,7 +52,7 @@ export default function ProfileScreen() {
   const bmi = profile.heightCm && profile.weightKg ? profile.weightKg / (profile.heightCm / 100) ** 2 : null;
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
       <Text style={styles.h1}>You</Text>
       <Text style={styles.sub}>{user?.email ?? 'Signed in'}</Text>
 

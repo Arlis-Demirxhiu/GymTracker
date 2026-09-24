@@ -127,7 +127,7 @@ export default function TodayScreen() {
   }, [logs]);
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
       <Text style={styles.h1}>{isToday ? 'Today' : WEEKDAY_NAMES[date.getDay()]}</Text>
 
       <View style={styles.dateRow}>

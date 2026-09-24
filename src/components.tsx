@@ -1,5 +1,5 @@
 import { ReactNode, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { BodyMap, MAPPED_PARTS } from './BodyMap';
 import { BODY_PART_MAP, BODY_PARTS } from './data';
 import { colors, radius } from './theme';
@@ -110,7 +110,12 @@ export function Button({
 }) {
   return (
     <Pressable
-      onPress={onPress}
+      // Close the keyboard first: after typing a note, the button's result
+      // (a saved log, a new exercise) should be visible, not hidden behind it.
+      onPress={() => {
+        Keyboard.dismiss();
+        onPress();
+      }}
       disabled={disabled}
       style={({ pressed }) => [
         styles.btn,

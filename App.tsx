@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { ComponentProps, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/auth';
 import AgendaScreen from './src/screens/AgendaScreen';
@@ -82,7 +82,10 @@ function Shell() {
           return (
             <Pressable
               key={t.key}
-              onPress={() => setTab(t.key)}
+              onPress={() => {
+                Keyboard.dismiss();
+                setTab(t.key);
+              }}
               style={styles.tab}
               accessibilityRole="tab"
               accessibilityState={{ selected: on }}
