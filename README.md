@@ -9,7 +9,7 @@ A React Native (Expo) app for tracking which body parts you train and planning a
 - **Agenda**: optional. Plan Monday through Sunday if you want to: set a name, mark a rest day, pick the body parts, and add or reorder exercises with sets and reps (or fill a day from the API in one tap). Every day starts empty.
 - **Body map**: pick muscles by tapping a front/back figure instead of a list (the list is still one tap away, and cardio stays a chip).
 - **Suggested exercises**: the muscles you select are sent to the [exercise API](#api), which answers with up to six exercises — shown on Today, and addable to any agenda day with one button.
-- **How to do each exercise**: tap a suggested exercise for the equipment or machine to use and how to set it up, the muscles it works, short form cues, and a button that opens form videos on YouTube. Agenda and planned exercises — including ones you typed yourself — have a ▶ button for the videos.
+- **How to do each exercise**: tap a suggested exercise — or the ▶ next to an agenda exercise — for a form video that plays inside the app, the equipment or machine and how to set it up, the muscles it works, and short form cues. Every exercise has a hand-picked tutorial from a coaching channel, streamed through YouTube's official embedded player with the creator credited; "More videos on YouTube" opens a search for alternatives. Exercises you type yourself fall back to that search.
 - **Equipment**: tell the app what you have — a full gym, dumbbells at home, nothing at all, or any mix of barbell, dumbbells, kettlebell, bench, machines, cables, pull-up bar, dip bars, cardio machines, jump rope and ab wheel. Suggestions only use exercises you can actually do, and the app says so when your kit can't train a muscle (biceps with no equipment, for example). Asked once at sign-up, changeable on the You tab.
 - **You**: your height, weight and experience level. The weight and level turn each suggested exercise into a starting kg (`2 × 16 kg` for dumbbells, `Bodyweight` where nothing is loaded); height is only used for BMI.
 - **Apple Health**: today's active and total calories, steps, exercise minutes and resting heart rate on the Today screen, and a one-tap import of your height and weight on the You tab. Read-only — nothing is written back to Health.
@@ -127,6 +127,12 @@ Run the tests with:
 cd server && npm test
 ```
 
+Videos can disappear or have embedding turned off by their creators. Check them all against YouTube with:
+
+```bash
+cd server && npm run check-videos
+```
+
 ## Structure
 
 ```
@@ -141,6 +147,7 @@ src/screens/             Auth, Onboarding, Today, Agenda, History, Profile
 server/src/catalog.ts    Exercise catalog
 server/src/select.ts     Picks up to six exercises for the chosen parts
 server/src/howto.ts      Setup and form cues per exercise, plus the video link
+server/src/videos.ts     The picked YouTube video for each exercise
 server/src/load.ts       Turns bodyweight + experience into a working weight
 server/src/users.ts      Accounts, password hashing, tokens, JSON persistence
 server/src/auth.ts       Bearer-token middleware and sign-in throttling

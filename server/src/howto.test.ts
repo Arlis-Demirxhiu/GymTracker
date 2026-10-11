@@ -28,3 +28,18 @@ test('the video link is a YouTube search for the exercise', () => {
   assert.equal(url.hostname, 'www.youtube.com');
   assert.match(url.searchParams.get('search_query') ?? '', /^Barbell Bench Press /);
 });
+
+test('picked videos belong to real exercises and look like YouTube ids', async () => {
+  const { VIDEOS } = await import('./videos.ts');
+  const ids = new Set(CATALOG.map((e) => e.id));
+  for (const [exercise, video] of Object.entries(VIDEOS)) {
+    assert.ok(ids.has(exercise), `${exercise} is not in the catalog`);
+    assert.match(video.videoId, /^[\w-]{11}$/, `${exercise} has a malformed video id`);
+  }
+});
+
+test('every exercise has a picked video', async () => {
+  const { VIDEOS } = await import('./videos.ts');
+  const missing = CATALOG.filter((e) => !VIDEOS[e.id]).map((e) => e.id);
+  assert.deepEqual(missing, []);
+});

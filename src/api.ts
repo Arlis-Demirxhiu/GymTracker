@@ -42,9 +42,24 @@ export type Suggestion = Exercise & {
   compound: boolean;
   /** Only present once the account has a bodyweight. */
   suggestedLoad?: SuggestedLoad;
-  /** Which machine or kit to use, form cues, and a link to form videos. */
-  howTo?: { setup: string; steps: string[]; videoUrl: string };
+  /** Which machine or kit to use, form cues, and form videos. */
+  howTo?: HowTo;
 };
+
+export type Video = { videoId: string; title: string; channel: string };
+
+export type HowTo = {
+  setup: string;
+  steps: string[];
+  /** A picked tutorial for the in-app player; null when none is picked yet. */
+  video: Video | null;
+  /** YouTube search for more videos. */
+  videoUrl: string;
+};
+
+/** What the how-to sheet needs; suggestions have all of it, agenda rows only a name. */
+export type ExerciseInfo = Pick<Suggestion, 'name'> &
+  Partial<Pick<Suggestion, 'sets' | 'reps' | 'equipment' | 'bodyPart' | 'also' | 'suggestedLoad' | 'howTo'>>;
 
 type RequestOptions = { method?: string; body?: unknown; token?: string | null };
 
@@ -104,6 +119,22 @@ export async function fetchSuggestions(parts: BodyPart[], token?: string | null)
   const query = new URLSearchParams({ parts: parts.join(',') });
   const body = await request<Suggestions>(`/exercises?${query.toString()}`, { token });
   return { exercises: body.exercises, uncovered: body.uncovered ?? [] };
+}
+
+let howToCatalog: Promise<Map<string, ExerciseInfo>> | null = null;
+
+/**
+ * Every catalog exercise's how-to keyed by lower-case name, fetched once.
+ * Agenda days store exercise names only, so this is how they find a video.
+ */
+export function howToByName(): Promise<Map<string, ExerciseInfo>> {
+  howToCatalog ??= request<{ exercises: ExerciseInfo[] }>('/how-to')
+    .then(({ exercises }) => new Map(exercises.map((x) => [x.name.toLowerCase(), x])))
+    .catch((err) => {
+      howToCatalog = null; // try again next time
+      throw err;
+    });
+  return howToCatalog;
 }
 
 /** A message worth showing: the server's complaint beats a generic network error. */

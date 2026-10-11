@@ -1,8 +1,9 @@
 import cors from 'cors';
 import express from 'express';
 import { clearFailures, lockedFor, optionalAuth, recordFailure, requireAuth } from './auth.ts';
-import { BODY_PARTS, equipmentLabel, GEAR, isBodyPart, isGear, type BodyPart, type Gear } from './catalog.ts';
+import { BODY_PARTS, CATALOG, equipmentLabel, GEAR, isBodyPart, isGear, type BodyPart, type CatalogExercise, type Gear } from './catalog.ts';
 import { HOW_TO, videoUrl } from './howto.ts';
+import { VIDEOS } from './videos.ts';
 import { isLevel, LEVELS, MAX_BODYWEIGHT, MIN_BODYWEIGHT, withLoads, type Level } from './load.ts';
 import { MAX_EXERCISES, selectExercises, uncoveredParts } from './select.ts';
 import {
@@ -35,6 +36,30 @@ app.get('/body-parts', (_req, res) => {
 
 app.get('/equipment', (_req, res) => {
   res.json({ equipment: GEAR });
+});
+
+/** Setup, form cues, an embeddable video (when one is picked) and a search link. */
+const howToFor = (exercise: CatalogExercise) => ({
+  ...HOW_TO[exercise.id],
+  video: VIDEOS[exercise.id] ?? null,
+  videoUrl: videoUrl(exercise.name),
+});
+
+/**
+ * Every exercise's how-to, for screens that only know an exercise by name
+ * (agenda days store names, not catalog ids).
+ */
+app.get('/how-to', (_req, res) => {
+  res.json({
+    exercises: CATALOG.map((x) => ({
+      id: x.id,
+      name: x.name,
+      bodyPart: x.bodyPart,
+      also: x.also,
+      equipment: equipmentLabel(x.requires),
+      howTo: howToFor(x),
+    })),
+  });
 });
 
 // ---- accounts ----
@@ -183,7 +208,7 @@ app.get('/exercises', optionalAuth, (req, res) => {
   const exercises = loaded.map((x) => ({
     ...x,
     equipment: equipmentLabel(x.requires),
-    howTo: { ...HOW_TO[x.id], videoUrl: videoUrl(x.name) },
+    howTo: howToFor(x),
   }));
 
   res.json({
