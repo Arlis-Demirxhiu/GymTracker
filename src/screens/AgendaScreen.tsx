@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetchSuggestions } from '../api';
 import { useAuth } from '../auth';
 import { BodyPartSelector, BodyPartTag, Button, Card } from '../components';
+import { WatchButton } from '../ExerciseSheet';
 import { dayTitle, newId, partsTitle, WEEK_ORDER, WEEKDAY_NAMES } from '../data';
 import { KeyboardAwareScrollView } from '../KeyboardAwareScrollView';
 import { useStore } from '../store';
@@ -214,6 +215,9 @@ function DayEditor({
                           {[e.sets && `${e.sets} sets`, e.reps && `${e.reps} reps`].filter(Boolean).join(' × ')}
                         </Text>
                       )}
+                    </View>
+                    <View style={styles.iconBtn}>
+                      <WatchButton name={e.name} />
                     </View>
                     <Pressable onPress={() => moveExercise(i, -1)} hitSlop={6} style={styles.iconBtn} disabled={i === 0}>
                       <Ionicons name="arrow-up" size={18} color={i === 0 ? colors.textFaint : colors.textDim} />

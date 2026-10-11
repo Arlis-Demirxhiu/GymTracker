@@ -42,6 +42,8 @@ export type Suggestion = Exercise & {
   compound: boolean;
   /** Only present once the account has a bodyweight. */
   suggestedLoad?: SuggestedLoad;
+  /** Which machine or kit to use, form cues, and a link to form videos. */
+  howTo?: { setup: string; steps: string[]; videoUrl: string };
 };
 
 type RequestOptions = { method?: string; body?: unknown; token?: string | null };

@@ -2,6 +2,7 @@ import cors from 'cors';
 import express from 'express';
 import { clearFailures, lockedFor, optionalAuth, recordFailure, requireAuth } from './auth.ts';
 import { BODY_PARTS, equipmentLabel, GEAR, isBodyPart, isGear, type BodyPart, type Gear } from './catalog.ts';
+import { HOW_TO, videoUrl } from './howto.ts';
 import { isLevel, LEVELS, MAX_BODYWEIGHT, MIN_BODYWEIGHT, withLoads, type Level } from './load.ts';
 import { MAX_EXERCISES, selectExercises, uncoveredParts } from './select.ts';
 import {
@@ -179,7 +180,11 @@ app.get('/exercises', optionalAuth, (req, res) => {
   const parts = requested as BodyPart[];
   const picked = selectExercises(parts, limit, available);
   const loaded = bodyweight === null ? picked : withLoads(picked, bodyweight, level);
-  const exercises = loaded.map((x) => ({ ...x, equipment: equipmentLabel(x.requires) }));
+  const exercises = loaded.map((x) => ({
+    ...x,
+    equipment: equipmentLabel(x.requires),
+    howTo: { ...HOW_TO[x.id], videoUrl: videoUrl(x.name) },
+  }));
 
   res.json({
     parts,

@@ -11,9 +11,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { fetchSuggestions, useSuggestions } from '../api';
+import { fetchSuggestions, Suggestion, useSuggestions } from '../api';
 import { useAuth } from '../auth';
 import { BodyPartSelector, BodyPartTag, Button, Card, SectionTitle } from '../components';
+import { ExerciseSheet, WatchButton } from '../ExerciseSheet';
 import { HealthCard } from '../HealthCard';
 import {
   addDays,
@@ -58,6 +59,7 @@ export default function TodayScreen() {
 
   const [selected, setSelected] = useState<BodyPart[]>([]);
   const [note, setNote] = useState('');
+  const [howTo, setHowTo] = useState<Suggestion | null>(null);
 
   // Load the saved log whenever the viewed date (or its saved log) changes.
   useEffect(() => {
@@ -162,11 +164,14 @@ export default function TodayScreen() {
                 ))}
               </View>
               {plan.exercises.map((e) => (
-                <View key={e.id} style={styles.exRow}>
-                  <Text style={styles.exName}>{e.name}</Text>
+                <View key={e.id} style={[styles.exRow, { alignItems: 'center' }]}>
+                  <Text style={[styles.exName, { flex: 1 }]}>{e.name}</Text>
                   <Text style={styles.exMeta}>
                     {[e.sets && `${e.sets} sets`, e.reps && `${e.reps} reps`].filter(Boolean).join(' × ')}
                   </Text>
+                  <View style={{ marginLeft: 10 }}>
+                    <WatchButton name={e.name} />
+                  </View>
                 </View>
               ))}
               {plan.bodyParts.length > 0 && (
@@ -206,10 +211,19 @@ export default function TodayScreen() {
           ) : (
             <>
               {suggestions.exercises.map((e) => (
-                <View key={e.id} style={styles.exRow}>
+                <Pressable
+                  key={e.id}
+                  onPress={() => setHowTo(e)}
+                  style={({ pressed }) => [styles.exRow, pressed && { opacity: 0.6 }]}
+                  accessibilityRole="button"
+                  accessibilityHint="Shows how to do it and form videos"
+                >
                   <View style={{ flex: 1 }}>
                     <Text style={styles.exName}>{e.name}</Text>
-                    <Text style={styles.exSub}>{e.equipment}</Text>
+                    <View style={styles.exSubRow}>
+                      <Text style={styles.exSub}>{e.equipment}</Text>
+                      <Text style={styles.exHowTo}>  ·  ▶ How to</Text>
+                    </View>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
                     {!!e.suggestedLoad && (
@@ -221,7 +235,7 @@ export default function TodayScreen() {
                       {[e.sets && `${e.sets} sets`, e.reps && `${e.reps} reps`].filter(Boolean).join(' × ')}
                     </Text>
                   </View>
-                </View>
+                </Pressable>
               ))}
               {suggestions.uncovered.length > 0 && (
                 <View style={styles.uncovered}>
@@ -290,6 +304,7 @@ export default function TodayScreen() {
           </View>
         ))}
       </Card>
+      <ExerciseSheet exercise={howTo} onClose={() => setHowTo(null)} />
     </KeyboardAwareScrollView>
   );
 }
@@ -318,7 +333,9 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   exName: { color: colors.text, fontSize: 15, flexShrink: 1 },
-  exSub: { color: colors.textFaint, fontSize: 12, marginTop: 2 },
+  exSub: { color: colors.textFaint, fontSize: 12 },
+  exSubRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  exHowTo: { color: colors.accent, fontSize: 12, fontWeight: '600' },
   exMeta: { color: colors.textDim, fontSize: 14, marginLeft: 12 },
   errText: { color: colors.textDim, fontSize: 14 },
   exLoad: { color: colors.accent, fontSize: 15, fontWeight: '700' },
