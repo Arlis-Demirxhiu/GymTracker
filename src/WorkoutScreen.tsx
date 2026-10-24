@@ -1,21 +1,12 @@
-import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Animated,
-  Modal,
-  PanResponder,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { Suggestion } from "./api";
-import { Button } from "./components";
-import { ExerciseSheet } from "./ExerciseSheet";
-import { WorkoutProgress } from "./store";
-import { colors, radius } from "./theme";
+import { Ionicons } from '@expo/vector-icons';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { Suggestion } from './api';
+import { Button } from './components';
+import { ExerciseSheet } from './ExerciseSheet';
+import { WorkoutProgress } from './store';
+import { colors, radius } from './theme';
 
 /**
  * A workout in progress: drag the handle to reorder, swipe a row right to
@@ -32,8 +23,7 @@ const SLOT = ROW_HEIGHT + GAP;
 /** How far right a row must travel before letting go marks it done. */
 const SWIPE_THRESHOLD = 110;
 
-const clamp = (n: number, min: number, max: number) =>
-  Math.min(Math.max(n, min), max);
+const clamp = (n: number, min: number, max: number) => Math.min(Math.max(n, min), max);
 
 /** The saved order, minus exercises that are gone, plus new ones at the end. */
 const reconcile = (exercises: Suggestion[], progress?: WorkoutProgress) => {
@@ -55,46 +45,44 @@ export function WorkoutScreen({
   onChange: (progress: WorkoutProgress) => void;
   onClose: () => void;
 }) {
-  const byId = useMemo(
-    () => new Map(exercises.map((e) => [e.id, e])),
-    [exercises],
-  );
+  const byId = useMemo(() => new Map(exercises.map((e) => [e.id, e])), [exercises]);
   const order = reconcile(exercises, progress);
   const done = (progress?.done ?? []).filter((id) => byId.has(id));
   const [howTo, setHowTo] = useState<Suggestion | null>(null);
 
   // ---- dragging ----
+  // The picked-up row floats above the others, which stay put until it's
+  // dropped; then the rows it passed slide over to make room.
   const [drag, setDrag] = useState<{ from: number; to: number } | null>(null);
   const dragRef = useRef(drag);
   dragRef.current = drag;
-  const dragY = useRef(new Animated.Value(0)).current;
+  const lastDy = useRef(0);
   const shifts = useRef(new Map<string, Animated.Value>()).current;
   const shiftFor = (id: string) => {
     if (!shifts.has(id)) shifts.set(id, new Animated.Value(0));
     return shifts.get(id)!;
   };
+  /** A drop waiting for the new order to render before its rows settle. */
+  const pendingDrop = useRef<{ from: number; to: number; dy: number; id: string } | null>(null);
 
-  // While dragging, rows between the start and the hover slot slide out of the way.
-  useEffect(() => {
-    order.forEach((id, i) => {
-      let target = 0;
-      if (drag && i !== drag.from) {
-        if (drag.from < drag.to && i > drag.from && i <= drag.to)
-          target = -SLOT;
-        if (drag.from > drag.to && i >= drag.to && i < drag.from) target = SLOT;
-      }
-      Animated.spring(shiftFor(id), {
-        toValue: target,
-        useNativeDriver: true,
-        speed: 30,
-        bounciness: 0,
-      }).start();
-    });
+  // After a drop renders, start each moved row where it was on screen and
+  // slide it into its new slot, so nothing jumps.
+  useLayoutEffect(() => {
+    const p = pendingDrop.current;
+    if (!p || drag || order[p.to] !== p.id) return; // new order not rendered yet
+    pendingDrop.current = null;
+    const settle = (id: string, from: number) => {
+      const v = shiftFor(id);
+      v.setValue(from);
+      Animated.spring(v, { toValue: 0, useNativeDriver: true, speed: 24, bounciness: 4 }).start();
+    };
+    settle(p.id, p.dy - (p.to - p.from) * SLOT);
+    if (p.from < p.to) for (let i = p.from; i < p.to; i++) settle(order[i], SLOT);
+    if (p.from > p.to) for (let i = p.to + 1; i <= p.from; i++) settle(order[i], -SLOT);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drag?.from, drag?.to]);
+  }, [order.join(), drag]);
 
-  const save = (next: Partial<WorkoutProgress>) =>
-    onChange({ order, done, ...next });
+  const save = (next: Partial<WorkoutProgress>) => onChange({ order, done, ...next });
 
   const move = (from: number, to: number) => {
     if (from === to) return;
@@ -106,26 +94,24 @@ export function WorkoutScreen({
 
   const dragHandlers = {
     start: (index: number) => {
-      dragY.setValue(0);
+      // The dragged row rides on its own shift value — the same one it settles
+      // with after the drop — so it never swaps values mid-gesture and flickers.
+      shiftFor(order[index]).setValue(0);
+      lastDy.current = 0;
       setDrag({ from: index, to: index });
     },
     move: (dy: number) => {
       const current = dragRef.current;
       if (!current) return;
-      dragY.setValue(dy);
-      const to = clamp(
-        current.from + Math.round(dy / SLOT),
-        0,
-        order.length - 1,
-      );
+      shiftFor(order[current.from]).setValue(dy);
+      lastDy.current = dy;
+      const to = clamp(current.from + Math.round(dy / SLOT), 0, order.length - 1);
       if (to !== current.to) setDrag({ from: current.from, to });
     },
     end: () => {
       const current = dragRef.current;
       if (!current) return;
-      // Snap every row back to its slot in the same frame as the new order lands.
-      shifts.forEach((v) => v.setValue(0));
-      dragY.setValue(0);
+      pendingDrop.current = { ...current, dy: lastDy.current, id: order[current.from] };
       setDrag(null);
       move(current.from, current.to);
     },
@@ -141,15 +127,10 @@ export function WorkoutScreen({
   const complete = total > 0 && finished === total;
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="fullScreen"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       {/* A modal is its own root view, so it needs its own safe-area measurements. */}
       <SafeAreaProvider>
-        <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
+        <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
               <Text style={styles.title}>Your exercises</Text>
@@ -157,32 +138,17 @@ export function WorkoutScreen({
                 {finished} of {total} done
               </Text>
             </View>
-            <Pressable
-              onPress={onClose}
-              hitSlop={12}
-              accessibilityLabel="Close workout"
-            >
-              <Ionicons
-                name="close-circle"
-                size={32}
-                color={colors.textFaint}
-              />
+            <Pressable onPress={onClose} hitSlop={12} accessibilityLabel="Close workout">
+              <Ionicons name="close-circle" size={32} color={colors.textFaint} />
             </Pressable>
           </View>
 
           <View style={styles.progressTrack}>
-            <View
-              style={[
-                styles.progressFill,
-                { width: `${total ? (finished / total) * 100 : 0}%` },
-              ]}
-            />
+            <View style={[styles.progressFill, { width: `${total ? (finished / total) * 100 : 0}%` }]} />
           </View>
 
           <ScrollView contentContainerStyle={styles.list} scrollEnabled={!drag}>
-            <Text style={styles.hint}>
-              Hold ≡ and drag to reorder · swipe right when a set is finished
-            </Text>
+            <Text style={styles.hint}>Hold ≡ and drag to reorder · swipe right when a set is finished</Text>
 
             {order.map((id, index) => {
               const exercise = byId.get(id);
@@ -195,14 +161,20 @@ export function WorkoutScreen({
                     styles.slot,
                     {
                       zIndex: isDragged ? 10 : 0,
-                      transform: [
-                        { translateY: isDragged ? dragY : shiftFor(id) },
-                        { scale: isDragged ? 1.03 : 1 },
-                      ],
+                      transform: [{ translateY: shiftFor(id) }, { scale: isDragged ? 1.03 : 1 }],
                     },
                     isDragged && styles.lifted,
                   ]}
                 >
+                  {drag && drag.to === index && drag.to !== drag.from && (
+                    <View
+                      pointerEvents="none"
+                      style={[
+                        styles.dropLine,
+                        drag.to < drag.from ? { top: -GAP / 2 - 1.5 } : { bottom: -GAP / 2 - 1.5 },
+                      ]}
+                    />
+                  )}
                   <WorkoutRow
                     exercise={exercise}
                     index={index}
@@ -221,22 +193,11 @@ export function WorkoutScreen({
               <View style={styles.complete}>
                 <Text style={styles.completeEmoji}>🎉</Text>
                 <Text style={styles.completeTitle}>Workout complete</Text>
-                <Text style={styles.completeText}>
-                  Nice work. Stretch, drink some water, and log how it felt.
-                </Text>
-                <Button
-                  label="Finish"
-                  onPress={onClose}
-                  style={{ marginTop: 14, alignSelf: "stretch" }}
-                />
+                <Text style={styles.completeText}>Nice work. Stretch, drink some water, and log how it felt.</Text>
+                <Button label="Finish" onPress={onClose} style={{ marginTop: 14, alignSelf: 'stretch' }} />
               </View>
             ) : (
-              <Button
-                label="Finish for now"
-                variant="ghost"
-                onPress={onClose}
-                style={{ marginTop: 8 }}
-              />
+              <Button label="Finish for now" variant="ghost" onPress={onClose} style={{ marginTop: 8 }} />
             )}
           </ScrollView>
         </SafeAreaView>
@@ -279,8 +240,7 @@ function WorkoutRow({
   const swipe = useRef(
     PanResponder.create({
       // Only claim clearly horizontal, rightward moves, so scrolling still works.
-      onMoveShouldSetPanResponder: (_, g) =>
-        g.dx > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+      onMoveShouldSetPanResponder: (_, g) => g.dx > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
       onPanResponderTerminationRequest: () => false,
       onPanResponderMove: (_, g) => swipeX.setValue(Math.max(0, g.dx)),
       onPanResponderRelease: (_, g) => {
@@ -300,8 +260,7 @@ function WorkoutRow({
           }).start();
         }
       },
-      onPanResponderTerminate: () =>
-        Animated.spring(swipeX, { toValue: 0, useNativeDriver: true }).start(),
+      onPanResponderTerminate: () => Animated.spring(swipeX, { toValue: 0, useNativeDriver: true }).start(),
     }),
   ).current;
 
@@ -311,8 +270,7 @@ function WorkoutRow({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () =>
-        latest.current.drag.start(latest.current.index),
+      onPanResponderGrant: () => latest.current.drag.start(latest.current.index),
       onPanResponderMove: (_, g) => latest.current.drag.move(g.dy),
       onPanResponderRelease: () => latest.current.drag.end(),
       onPanResponderTerminate: () => latest.current.drag.end(),
@@ -322,32 +280,21 @@ function WorkoutRow({
   const revealed = swipeX.interpolate({
     inputRange: [0, SWIPE_THRESHOLD],
     outputRange: [0, 1],
-    extrapolate: "clamp",
+    extrapolate: 'clamp',
   });
-  const prescription = [
-    exercise.sets && `${exercise.sets} × ${exercise.reps}`,
-    exercise.suggestedLoad?.label,
-  ]
+  const prescription = [exercise.sets && `${exercise.sets} × ${exercise.reps}`, exercise.suggestedLoad?.label]
     .filter(Boolean)
-    .join("  ·  ");
+    .join('  ·  ');
 
   return (
     <View style={styles.rowWrap}>
       <Animated.View style={[styles.swipeBack, { opacity: revealed }]}>
-        <Ionicons
-          name={done ? "arrow-undo" : "checkmark-circle"}
-          size={24}
-          color={colors.accentText}
-        />
-        <Text style={styles.swipeText}>{done ? "Undo" : "Done"}</Text>
+        <Ionicons name={done ? 'arrow-undo' : 'checkmark-circle'} size={24} color={colors.accentText} />
+        <Text style={styles.swipeText}>{done ? 'Undo' : 'Done'}</Text>
       </Animated.View>
 
       <Animated.View
-        style={[
-          styles.row,
-          done && styles.rowDone,
-          { transform: [{ translateX: swipeX }] },
-        ]}
+        style={[styles.row, done && styles.rowDone, { transform: [{ translateX: swipeX }] }]}
         {...swipe.panHandlers}
       >
         <Pressable
@@ -358,21 +305,14 @@ function WorkoutRow({
           accessibilityLabel={`${exercise.name} done`}
         >
           <Ionicons
-            name={done ? "checkmark-circle" : "ellipse-outline"}
+            name={done ? 'checkmark-circle' : 'ellipse-outline'}
             size={28}
             color={done ? colors.accent : colors.textFaint}
           />
         </Pressable>
 
-        <Pressable
-          onPress={onOpen}
-          style={styles.rowBody}
-          accessibilityHint="Shows the video and how to do it"
-        >
-          <Text
-            style={[styles.name, done && styles.nameDone]}
-            numberOfLines={1}
-          >
+        <Pressable onPress={onOpen} style={styles.rowBody} accessibilityHint="Shows the video and how to do it">
+          <Text style={[styles.name, done && styles.nameDone]} numberOfLines={1}>
             {exercise.name}
           </Text>
           <Text style={styles.meta} numberOfLines={1}>
@@ -386,12 +326,10 @@ function WorkoutRow({
           accessible
           accessibilityRole="adjustable"
           accessibilityLabel={`Move ${exercise.name}, position ${index + 1} of ${count}`}
-          accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
+          accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
           onAccessibilityAction={(e) => {
-            if (e.nativeEvent.actionName === "decrement" && index < count - 1)
-              onMove(index + 1);
-            if (e.nativeEvent.actionName === "increment" && index > 0)
-              onMove(index - 1);
+            if (e.nativeEvent.actionName === 'decrement' && index < count - 1) onMove(index + 1);
+            if (e.nativeEvent.actionName === 'increment' && index > 0) onMove(index - 1);
           }}
         >
           <Ionicons name="reorder-three" size={26} color={colors.textDim} />
@@ -404,23 +342,23 @@ function WorkoutRow({
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 12,
   },
-  title: { color: colors.text, fontSize: 28, fontWeight: "800" },
+  title: { color: colors.text, fontSize: 28, fontWeight: '800' },
   count: { color: colors.textDim, fontSize: 14, marginTop: 2 },
   progressTrack: {
     height: 6,
     marginHorizontal: 20,
     borderRadius: radius.pill,
     backgroundColor: colors.cardAlt,
-    overflow: "hidden",
+    overflow: 'hidden',
   },
   progressFill: {
-    height: "100%",
+    height: '100%',
     backgroundColor: colors.accent,
     borderRadius: radius.pill,
   },
@@ -428,31 +366,39 @@ const styles = StyleSheet.create({
   hint: {
     color: colors.textFaint,
     fontSize: 12,
-    textAlign: "center",
+    textAlign: 'center',
     marginBottom: 14,
   },
   slot: { height: ROW_HEIGHT, marginBottom: GAP },
+  dropLine: {
+    position: 'absolute',
+    left: 6,
+    right: 6,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.accent,
+  },
   lifted: {
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOpacity: 0.4,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
     elevation: 8,
   },
-  rowWrap: { flex: 1, borderRadius: radius.md, overflow: "hidden" },
+  rowWrap: { flex: 1, borderRadius: radius.md, overflow: 'hidden' },
   swipeBack: {
     ...StyleSheet.absoluteFill,
     backgroundColor: colors.accent,
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
     paddingLeft: 20,
   },
-  swipeText: { color: colors.accentText, fontSize: 16, fontWeight: "800" },
+  swipeText: { color: colors.accentText, fontSize: 16, fontWeight: '800' },
   row: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
     paddingLeft: 14,
     backgroundColor: colors.card,
@@ -462,38 +408,38 @@ const styles = StyleSheet.create({
   },
   rowDone: {
     backgroundColor: colors.cardAlt,
-    borderColor: colors.accent + "55",
+    borderColor: colors.accent + '55',
   },
-  rowBody: { flex: 1, justifyContent: "center", height: "100%" },
-  name: { color: colors.text, fontSize: 16, fontWeight: "700" },
-  nameDone: { color: colors.textDim, textDecorationLine: "line-through" },
+  rowBody: { flex: 1, justifyContent: 'center', height: '100%' },
+  name: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  nameDone: { color: colors.textDim, textDecorationLine: 'line-through' },
   meta: { color: colors.textDim, fontSize: 13, marginTop: 3 },
   handle: {
     width: 52,
-    height: "100%",
-    alignItems: "center",
-    justifyContent: "center",
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   complete: {
-    alignItems: "center",
+    alignItems: 'center',
     padding: 20,
     marginTop: 8,
     borderRadius: radius.lg,
     backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: colors.accent + "55",
+    borderColor: colors.accent + '55',
   },
   completeEmoji: { fontSize: 36 },
   completeTitle: {
     color: colors.text,
     fontSize: 20,
-    fontWeight: "800",
+    fontWeight: '800',
     marginTop: 6,
   },
   completeText: {
     color: colors.textDim,
     fontSize: 14,
-    textAlign: "center",
+    textAlign: 'center',
     marginTop: 6,
   },
 });
