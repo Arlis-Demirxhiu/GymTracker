@@ -9,7 +9,7 @@ import { WorkoutProgress } from './store';
 import { colors, radius } from './theme';
 
 /**
- * A workout in progress: drag the handle to reorder, swipe a row right to
+ * A workout in progress: hold a row and drag to reorder, swipe it right to
  * mark it done (swipe again to undo), tap it for the video and form cues.
  *
  * Built on PanResponder and Animated from React Native itself, so it needs no
@@ -22,6 +22,8 @@ const GAP = 10;
 const SLOT = ROW_HEIGHT + GAP;
 /** How far right a row must travel before letting go marks it done. */
 const SWIPE_THRESHOLD = 110;
+/** How long a press must last before the row lifts for dragging. */
+const HOLD_MS = 250;
 
 const clamp = (n: number, min: number, max: number) => Math.min(Math.max(n, min), max);
 
@@ -148,7 +150,7 @@ export function WorkoutScreen({
           </View>
 
           <ScrollView contentContainerStyle={styles.list} scrollEnabled={!drag}>
-            <Text style={styles.hint}>Hold ≡ and drag to reorder · swipe right when a set is finished</Text>
+            <Text style={styles.hint}>Hold an exercise and drag to reorder · swipe right when it's done</Text>
 
             {order.map((id, index) => {
               const exercise = byId.get(id);
@@ -240,7 +242,7 @@ function WorkoutRow({
   const swipe = useRef(
     PanResponder.create({
       // Only claim clearly horizontal, rightward moves, so scrolling still works.
-      onMoveShouldSetPanResponder: (_, g) => g.dx > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+      onMoveShouldSetPanResponder: (_, g) => !armed.current && g.dx > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
       onPanResponderTerminationRequest: () => false,
       onPanResponderMove: (_, g) => swipeX.setValue(Math.max(0, g.dx)),
       onPanResponderRelease: (_, g) => {
@@ -264,18 +266,47 @@ function WorkoutRow({
     }),
   ).current;
 
-  // ---- drag handle ----
-  const handle = useRef(
+  // ---- hold anywhere, then drag ----
+  // A press held for HOLD_MS lifts the row; from then on this responder
+  // steals the touch from the Pressables underneath and follows the finger.
+  // A quick tap still opens the video, an early sideways move still swipes,
+  // and an early vertical move still scrolls the list.
+  const armed = useRef(false);
+  const dragging = useRef(false);
+  const hold = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponderCapture: () => armed.current,
       onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () => latest.current.drag.start(latest.current.index),
+      onPanResponderGrant: () => {
+        dragging.current = true;
+      },
       onPanResponderMove: (_, g) => latest.current.drag.move(g.dy),
-      onPanResponderRelease: () => latest.current.drag.end(),
-      onPanResponderTerminate: () => latest.current.drag.end(),
+      onPanResponderRelease: () => finishDrag(),
+      onPanResponderTerminate: () => finishDrag(),
     }),
   ).current;
+
+  const finishDrag = () => {
+    if (!armed.current) return;
+    armed.current = false;
+    dragging.current = false;
+    latest.current.drag.end();
+  };
+
+  const holdProps = {
+    delayLongPress: HOLD_MS,
+    onLongPress: () => {
+      armed.current = true;
+      latest.current.drag.start(latest.current.index);
+    },
+    // Lifted and let go without moving: put the row back down. When a drag
+    // took over instead, its own release ends it.
+    onPressOut: () =>
+      requestAnimationFrame(() => {
+        if (armed.current && !dragging.current) finishDrag();
+      }),
+  };
 
   const revealed = swipeX.interpolate({
     inputRange: [0, SWIPE_THRESHOLD],
@@ -287,7 +318,7 @@ function WorkoutRow({
     .join('  ·  ');
 
   return (
-    <View style={styles.rowWrap}>
+    <View style={styles.rowWrap} {...hold.panHandlers}>
       <Animated.View style={[styles.swipeBack, { opacity: revealed }]}>
         <Ionicons name={done ? 'arrow-undo' : 'checkmark-circle'} size={24} color={colors.accentText} />
         <Text style={styles.swipeText}>{done ? 'Undo' : 'Done'}</Text>
@@ -299,6 +330,7 @@ function WorkoutRow({
       >
         <Pressable
           onPress={onToggle}
+          {...holdProps}
           hitSlop={8}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: done }}
@@ -311,7 +343,17 @@ function WorkoutRow({
           />
         </Pressable>
 
-        <Pressable onPress={onOpen} style={styles.rowBody} accessibilityHint="Shows the video and how to do it">
+        <Pressable
+          onPress={onOpen}
+          {...holdProps}
+          style={styles.rowBody}
+          accessibilityHint="Opens the video. Swipe up or down with one finger to move it."
+          accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+          onAccessibilityAction={(e) => {
+            if (e.nativeEvent.actionName === 'decrement' && index < count - 1) onMove(index + 1);
+            if (e.nativeEvent.actionName === 'increment' && index > 0) onMove(index - 1);
+          }}
+        >
           <Text style={[styles.name, done && styles.nameDone]} numberOfLines={1}>
             {exercise.name}
           </Text>
@@ -319,21 +361,6 @@ function WorkoutRow({
             {prescription}
           </Text>
         </Pressable>
-
-        <View
-          {...handle.panHandlers}
-          style={styles.handle}
-          accessible
-          accessibilityRole="adjustable"
-          accessibilityLabel={`Move ${exercise.name}, position ${index + 1} of ${count}`}
-          accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-          onAccessibilityAction={(e) => {
-            if (e.nativeEvent.actionName === 'decrement' && index < count - 1) onMove(index + 1);
-            if (e.nativeEvent.actionName === 'increment' && index > 0) onMove(index - 1);
-          }}
-        >
-          <Ionicons name="reorder-three" size={26} color={colors.textDim} />
-        </View>
       </Animated.View>
     </View>
   );
@@ -410,16 +437,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cardAlt,
     borderColor: colors.accent + '55',
   },
-  rowBody: { flex: 1, justifyContent: 'center', height: '100%' },
+  rowBody: { flex: 1, justifyContent: 'center', height: '100%', paddingRight: 14 },
   name: { color: colors.text, fontSize: 16, fontWeight: '700' },
   nameDone: { color: colors.textDim, textDecorationLine: 'line-through' },
   meta: { color: colors.textDim, fontSize: 13, marginTop: 3 },
-  handle: {
-    width: 52,
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   complete: {
     alignItems: 'center',
     padding: 20,
