@@ -11,6 +11,15 @@ import { Agenda, BodyPart, DayPlan, Weekday, WorkoutLog } from './types';
 const agendaKey = (userId: string) => `gymtracker:agenda:v2:${userId}`;
 const logsKey = (userId: string) => `gymtracker:logs:v2:${userId}`;
 const settingsKey = (userId: string) => `gymtracker:settings:v1:${userId}`;
+const workoutsKey = (userId: string) => `gymtracker:workouts:v1:${userId}`;
+
+/** Progress through one day's workout: the order chosen and what's finished. */
+export type WorkoutProgress = {
+  /** Exercise ids in the order the user arranged them. */
+  order: string[];
+  /** Exercise ids marked done. */
+  done: string[];
+};
 
 type Settings = {
   /** Saving a workout on Today also makes it that weekday's agenda plan. */
@@ -25,6 +34,9 @@ type Store = {
   logs: WorkoutLog[];
   settings: Settings;
   updateSettings: (patch: Partial<Settings>) => void;
+  /** Keyed by date (YYYY-MM-DD). */
+  workouts: Record<string, WorkoutProgress>;
+  updateWorkout: (date: string, progress: WorkoutProgress) => void;
   updateDay: (day: Weekday, plan: DayPlan) => void;
   resetAgenda: () => void;
   /** Creates or replaces the log for a date. Empty body parts + empty note deletes it. */
@@ -42,6 +54,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [agenda, setAgenda] = useState<Agenda>(DEFAULT_AGENDA);
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [workouts, setWorkouts] = useState<Record<string, WorkoutProgress>>({});
 
   // Swap to the signed-in account's data (and away from it on sign-out).
   useEffect(() => {
@@ -50,6 +63,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setAgenda(DEFAULT_AGENDA);
     setLogs([]);
     setSettings(DEFAULT_SETTINGS);
+    setWorkouts({});
 
     if (!userId) {
       setReady(true);
@@ -58,15 +72,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     (async () => {
       try {
-        const [a, l, st] = await Promise.all([
+        const [a, l, st, w] = await Promise.all([
           AsyncStorage.getItem(agendaKey(userId)),
           AsyncStorage.getItem(logsKey(userId)),
           AsyncStorage.getItem(settingsKey(userId)),
+          AsyncStorage.getItem(workoutsKey(userId)),
         ]);
         if (cancelled) return;
         if (a) setAgenda(JSON.parse(a));
         if (l) setLogs(JSON.parse(l));
         if (st) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(st) });
+        if (w) setWorkouts(JSON.parse(w));
       } catch (e) {
         console.warn('Failed to load saved data', e);
       } finally {
@@ -95,6 +111,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setSettings((prev) => ({ ...prev, ...patch }));
   }, []);
 
+  useEffect(() => {
+    if (ready && userId) AsyncStorage.setItem(workoutsKey(userId), JSON.stringify(workouts)).catch(console.warn);
+  }, [workouts, ready, userId]);
+
+  const updateWorkout = useCallback((date: string, progress: WorkoutProgress) => {
+    setWorkouts((prev) => ({ ...prev, [date]: progress }));
+  }, []);
+
   const updateDay = useCallback((day: Weekday, plan: DayPlan) => {
     setAgenda((prev) => ({ ...prev, [day]: plan }));
   }, []);
@@ -118,8 +142,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const logForDate = useCallback((date: string) => logs.find((l) => l.date === date), [logs]);
 
   const value = useMemo(
-    () => ({ ready, agenda, logs, settings, updateSettings, updateDay, resetAgenda, saveLog, deleteLog, logForDate }),
-    [ready, agenda, logs, settings, updateSettings, updateDay, resetAgenda, saveLog, deleteLog, logForDate],
+    () => ({
+      ready,
+      agenda,
+      logs,
+      settings,
+      updateSettings,
+      workouts,
+      updateWorkout,
+      updateDay,
+      resetAgenda,
+      saveLog,
+      deleteLog,
+      logForDate,
+    }),
+    [ready, agenda, logs, settings, updateSettings, workouts, updateWorkout, updateDay, resetAgenda, saveLog, deleteLog, logForDate],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

@@ -16,6 +16,7 @@ import { useAuth } from '../auth';
 import { BodyPartSelector, BodyPartTag, Button, Card, SectionTitle } from '../components';
 import { ExerciseSheet, WatchButton } from '../ExerciseSheet';
 import { HealthCard } from '../HealthCard';
+import { WorkoutScreen } from '../WorkoutScreen';
 import {
   addDays,
   BODY_PART_MAP,
@@ -47,7 +48,7 @@ const confirm = (title: string, message: string) =>
   });
 
 export default function TodayScreen() {
-  const { agenda, logs, saveLog, logForDate, settings, updateSettings, updateDay } = useStore();
+  const { agenda, logs, saveLog, logForDate, settings, updateSettings, updateDay, workouts, updateWorkout } = useStore();
   const { token, user } = useAuth();
   const profile = user!.profile;
   const todayKey = toDateKey(new Date());
@@ -60,6 +61,7 @@ export default function TodayScreen() {
   const [selected, setSelected] = useState<BodyPart[]>([]);
   const [note, setNote] = useState('');
   const [howTo, setHowTo] = useState<Suggestion | null>(null);
+  const [inWorkout, setInWorkout] = useState(false);
 
   // Load the saved log whenever the viewed date (or its saved log) changes.
   useEffect(() => {
@@ -115,6 +117,21 @@ export default function TodayScreen() {
     }
     updateDay(weekday, { title: '', rest: false, bodyParts: selected, exercises });
   };
+
+  const workout = workouts[dateKey];
+  // Show exercises in the order arranged in the workout screen, new ones last.
+  const orderedExercises = [...suggestions.exercises].sort((a, b) => {
+    const order = workout?.order ?? [];
+    const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
+    return rank(a.id) - rank(b.id);
+  });
+  const doneCount = (workout?.done ?? []).filter((id) => suggestions.exercises.some((e) => e.id === id)).length;
+  const startLabel =
+    doneCount === 0
+      ? '▶  Start workout'
+      : doneCount >= suggestions.exercises.length
+        ? '✓  Workout complete — view'
+        : `▶  Continue workout · ${doneCount}/${suggestions.exercises.length} done`;
 
   // Before anything is logged the screen simply asks what you feel like training.
   const askWhatToTrain = savedParts.length === 0;
@@ -210,7 +227,7 @@ export default function TodayScreen() {
             </View>
           ) : (
             <>
-              {suggestions.exercises.map((e) => (
+              {orderedExercises.map((e) => (
                 <Pressable
                   key={e.id}
                   onPress={() => setHowTo(e)}
@@ -237,6 +254,13 @@ export default function TodayScreen() {
                   </View>
                 </Pressable>
               ))}
+              {suggestions.exercises.length > 0 && (
+                <Button
+                  label={startLabel}
+                  onPress={() => setInWorkout(true)}
+                  style={{ marginTop: 14 }}
+                />
+              )}
               {suggestions.uncovered.length > 0 && (
                 <View style={styles.uncovered}>
                   <Ionicons name="alert-circle-outline" size={18} color="#FFB84D" />
@@ -305,6 +329,13 @@ export default function TodayScreen() {
         ))}
       </Card>
       <ExerciseSheet exercise={howTo} onClose={() => setHowTo(null)} />
+      <WorkoutScreen
+        visible={inWorkout}
+        exercises={suggestions.exercises}
+        progress={workout}
+        onChange={(progress) => updateWorkout(dateKey, progress)}
+        onClose={() => setInWorkout(false)}
+      />
     </KeyboardAwareScrollView>
   );
 }
