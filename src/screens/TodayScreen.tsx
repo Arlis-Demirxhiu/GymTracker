@@ -125,7 +125,8 @@ export default function TodayScreen() {
     const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
     return rank(a.id) - rank(b.id);
   });
-  const doneCount = (workout?.done ?? []).filter((id) => suggestions.exercises.some((e) => e.id === id)).length;
+  const doneIds = (workout?.done ?? []).filter((id) => suggestions.exercises.some((e) => e.id === id));
+  const doneCount = doneIds.length;
   const startLabel =
     doneCount === 0
       ? '▶  Start workout'
@@ -227,33 +228,40 @@ export default function TodayScreen() {
             </View>
           ) : (
             <>
-              {orderedExercises.map((e) => (
-                <Pressable
-                  key={e.id}
-                  onPress={() => setHowTo(e)}
-                  style={({ pressed }) => [styles.exRow, pressed && { opacity: 0.6 }]}
-                  accessibilityRole="button"
-                  accessibilityHint="Shows how to do it and form videos"
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.exName}>{e.name}</Text>
-                    <View style={styles.exSubRow}>
-                      <Text style={styles.exSub}>{e.equipment}</Text>
-                      <Text style={styles.exHowTo}>  ·  ▶ How to</Text>
-                    </View>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    {!!e.suggestedLoad && (
-                      <Text style={[styles.exLoad, e.suggestedLoad.kg === null && { color: colors.textDim }]}>
-                        {e.suggestedLoad.label}
-                      </Text>
+              {orderedExercises.map((e) => {
+                const isDone = doneIds.includes(e.id);
+                return (
+                  <Pressable
+                    key={e.id}
+                    onPress={() => setHowTo(e)}
+                    style={({ pressed }) => [styles.exRow, pressed && { opacity: 0.6 }]}
+                    accessibilityRole="button"
+                    accessibilityState={{ checked: isDone }}
+                    accessibilityHint="Shows how to do it and form videos"
+                  >
+                    {isDone && (
+                      <Ionicons name="checkmark-circle" size={22} color={colors.accent} style={styles.exTick} />
                     )}
-                    <Text style={styles.exMeta}>
-                      {[e.sets && `${e.sets} sets`, e.reps && `${e.reps} reps`].filter(Boolean).join(' × ')}
-                    </Text>
-                  </View>
-                </Pressable>
-              ))}
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.exName, isDone && styles.exNameDone]}>{e.name}</Text>
+                      <View style={styles.exSubRow}>
+                        <Text style={styles.exSub}>{e.equipment}</Text>
+                        <Text style={styles.exHowTo}>  ·  ▶ How to</Text>
+                      </View>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      {!!e.suggestedLoad && (
+                        <Text style={[styles.exLoad, e.suggestedLoad.kg === null && { color: colors.textDim }]}>
+                          {e.suggestedLoad.label}
+                        </Text>
+                      )}
+                      <Text style={styles.exMeta}>
+                        {[e.sets && `${e.sets} sets`, e.reps && `${e.reps} reps`].filter(Boolean).join(' × ')}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
               {suggestions.exercises.length > 0 && (
                 <Button
                   label={startLabel}
@@ -364,6 +372,8 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   exName: { color: colors.text, fontSize: 15, flexShrink: 1 },
+  exNameDone: { color: colors.textDim, textDecorationLine: 'line-through' },
+  exTick: { marginRight: 10, alignSelf: 'center' },
   exSub: { color: colors.textFaint, fontSize: 12 },
   exSubRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   exHowTo: { color: colors.accent, fontSize: 12, fontWeight: '600' },
